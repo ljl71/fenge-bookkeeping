@@ -640,6 +640,27 @@ textarea {
   border-bottom: 1px solid var(--line);
 }
 
+.table-list > button {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+}
+
+.recent-customer-list span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .bar-row {
   display: flex;
   flex-direction: column;

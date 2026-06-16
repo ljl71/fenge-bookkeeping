@@ -9,7 +9,17 @@ export function saveSession(session: AppSession) {
 export function readSession(): AppSession | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as AppSession) : null;
+    if (!raw) return null;
+    const session = JSON.parse(raw) as AppSession;
+    if (!session.storeId || !session.storeName || !session.loginToken || !session.expiresAt) {
+      clearSession();
+      return null;
+    }
+    if (new Date(session.expiresAt).getTime() <= Date.now()) {
+      clearSession();
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }
@@ -19,11 +29,13 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-export function makeSession(storeId: string, storeName: string, role: Role): AppSession {
+export function makeSession(storeId: string, storeName: string, role: Role, loginToken: string, expiresAt: string): AppSession {
   return {
     storeId,
     storeName,
     role,
-    loginAt: new Date().toISOString()
+    loginToken,
+    loginAt: new Date().toISOString(),
+    expiresAt
   };
 }

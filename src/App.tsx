@@ -89,6 +89,24 @@ export function App() {
   }, [session, refreshData]);
 
   useEffect(() => {
+    if (!session) return;
+    const delay = new Date(session.expiresAt).getTime() - Date.now();
+    if (delay <= 0) {
+      logoutStore();
+      setSession(null);
+      setData(emptyData());
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      logoutStore();
+      setSession(null);
+      setData(emptyData());
+      setToast({ kind: 'info', message: '登录已过期，请重新登录' });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [session]);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 2800);
     return () => window.clearTimeout(timer);

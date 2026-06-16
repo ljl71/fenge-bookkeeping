@@ -111,7 +111,9 @@ export interface AppSession {
   storeId: string;
   storeName: string;
   role: Role;
+  loginToken: string;
   loginAt: string;
+  expiresAt: string;
 }
 
 export interface AppData {

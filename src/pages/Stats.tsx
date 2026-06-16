@@ -6,8 +6,10 @@ import { DateRangePicker } from '../components/DateRangePicker';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { SummaryCard } from '../components/SummaryCard';
-import { getDateRange } from '../utils/date';
+import { getDateRange, sortByDateDesc } from '../utils/date';
+import { itemsText } from '../utils/exportCsv';
 import { formatMoney } from '../utils/money';
+import { maskPhone } from '../utils/phone';
 import { customerStats, groupAmount, inDateRange, summarize } from '../utils/stats';
 
 function BarRow({ label, value, max }: { label: string; value: number; max: number }) {
@@ -63,6 +65,18 @@ export function Stats() {
     .filter((row) => row.stats.count > 0)
     .sort((a, b) => b.stats.total - a.stats.total)
     .slice(0, 10);
+  const recentCustomers = sortByDateDesc(rows.filter((row) => row.type === 'income')).reduce<
+    Array<{ transaction: Transaction; customerId: string }>
+  >((result, transaction) => {
+    const customer =
+      data.customers.find((row) => row._id === transaction.customerId) ||
+      data.customers.find((row) => row.name === transaction.customerName && row.phone === transaction.customerPhone);
+    const customerId = customer?._id || transaction.customerId || '';
+    const key = customerId || `${transaction.customerName || '未知'}-${transaction.customerPhone || ''}`;
+    if (!key || result.some((row) => row.customerId === key)) return result;
+    result.push({ transaction, customerId: key });
+    return result;
+  }, []).slice(0, 10);
   const maxCategory = Math.max(0, ...byCategory.map((row) => row.income));
 
   function changePreset(next: DatePreset) {
@@ -177,6 +191,37 @@ export function Stats() {
           </div>
         ) : (
           <EmptyState title="暂无顾客消费排行" />
+        )}
+      </section>
+      <section className="panel">
+        <h2>最近消费顾客</h2>
+        {recentCustomers.length ? (
+          <div className="table-list recent-customer-list">
+            {recentCustomers.map(({ transaction, customerId }) => {
+              const customer = data.customers.find((row) => row._id === customerId);
+              const targetId = customer?._id || transaction.customerId || '';
+              return (
+                <button
+                  key={customerId}
+                  type="button"
+                  disabled={!targetId}
+                  onClick={() => targetId && navigate('customerDetail', { id: targetId })}
+                >
+                  <span>
+                    <strong>{transaction.customerName || customer?.name || '未知顾客'}</strong>
+                    <small>
+                      {maskPhone(transaction.customerPhone || customer?.phone)} · {transaction.date} · {itemsText(transaction)}
+                    </small>
+                  </span>
+                  <strong>
+                    {formatMoney(transaction.totalAmount)} · {transaction.paymentMethodName}
+                  </strong>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState title="暂无最近消费顾客" text="当前时间范围内还没有收入流水。" />
         )}
       </section>
     </div>

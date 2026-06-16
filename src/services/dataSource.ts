@@ -1,4 +1,4 @@
-import type { CollectionName, Store } from '../types';
+import type { CollectionName } from '../types';
 import { isDemoMode } from '../cloudbase/app';
 import { cloudAdd, cloudList, cloudUpdate } from '../cloudbase/db';
 import { localDatabase } from './localDatabase';
@@ -6,12 +6,6 @@ import { localDatabase } from './localDatabase';
 export async function listCollection<T>(collection: CollectionName, storeId: string): Promise<T[]> {
   if (isDemoMode) return localDatabase.list<T>(collection, storeId);
   return cloudList<T>(collection, { storeId });
-}
-
-export async function findStore(storeId: string): Promise<Store | undefined> {
-  if (isDemoMode) return localDatabase.getStore(storeId);
-  const rows = await cloudList<Store>('stores', { storeId, active: true });
-  return rows[0];
 }
 
 export async function addRecord<T extends { _id?: string }>(
