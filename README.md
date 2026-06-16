@@ -63,6 +63,8 @@ VITE_APP_DEMO_MODE=false
 - `stores` 集合不允许前端直接读取 `pinHash`。
 - `customers`、`transactions`、`serviceCategories`、`serviceItems`、`expenseCategories`、`paymentMethods` 必须按 `storeId` 隔离。
 - 前端所有查询、新增、更新、软删除都必须携带当前登录店铺的 `storeId`。
+- 匿名登录或 Web 端访问权限不要给过大，不能开放全库读写。
+- 数据库规则需要明确限制只能访问当前店铺范围内的数据；不要因为是家庭工具就把集合设成完全公开。
 - 这是家庭小店内部工具，不建议开放成公开注册系统或商业 SaaS。
 
 ## loginStore 云函数
@@ -81,6 +83,8 @@ cloudfunctions/loginStore
 - 校验 `pinHash`
 - 校验店铺是否存在、是否停用
 - 登录成功后返回 `storeId`、`storeName`、`loginToken`、`createdAt`、`expiresAt`
+
+第一版的 `loginToken` 只是前端本地登录态标记，用于判断“这台手机是否已经登录”和过期时间；它还不是完整的云端鉴权 token。业务数据安全仍然依赖 CloudBase 数据库安全规则和所有查询携带 `storeId`。如果后续要做更严格的安全校验，需要新增云端 session 集合，在每次云函数或数据库代理调用时校验 token、过期时间和店铺权限。
 
 部署步骤：
 

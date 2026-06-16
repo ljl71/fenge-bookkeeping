@@ -1,5 +1,4 @@
 import type { ExpenseCategory, PaymentMethod, ServiceCategory, ServiceItem, Store } from '../types';
-import { hashPinSyncFallback } from '../utils/hash';
 
 export const DEMO_PIN = '123456';
 export const DEMO_STORE_ID = 'fenge';
@@ -26,7 +25,6 @@ export function defaultStore(now: string): Store {
     _id: 'store-fenge',
     storeId: DEMO_STORE_ID,
     name: DEMO_STORE_NAME,
-    pinHash: hashPinSyncFallback(DEMO_PIN),
     active: true,
     createdAt: now,
     updatedAt: now

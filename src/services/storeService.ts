@@ -3,7 +3,6 @@ import { clearSession, makeSession, readSession, saveSession } from '../cloudbas
 import { callLoginStoreFunction } from '../cloudbase/functions';
 import { DEMO_PIN } from '../constants/defaults';
 import type { AppSession, Role } from '../types';
-import { pinMatches } from '../utils/hash';
 import { localDatabase } from './localDatabase';
 
 export function getSavedSession(): AppSession | null {
@@ -21,7 +20,7 @@ export async function loginStore(storeId: string, pin: string, role: Role): Prom
       throw new Error('未找到店铺。本地演示默认店铺 ID 是 fenge');
     }
 
-    const ok = await pinMatches(pin, store.pinHash);
+    const ok = pin === DEMO_PIN;
     if (!ok) throw new Error(`PIN 不正确。本地演示默认 PIN 是 ${DEMO_PIN}`);
 
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
