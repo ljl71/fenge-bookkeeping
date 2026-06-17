@@ -133,7 +133,6 @@ export interface QueryFilters {
   keyword: string;
   categoryId: string;
   paymentMethodId: string;
-  noteKeyword: string;
   createdBy: 'all' | Role;
 }
 

@@ -24,7 +24,6 @@ function defaultFilters(): QueryFilters {
     keyword: '',
     categoryId: '',
     paymentMethodId: '',
-    noteKeyword: '',
     createdBy: 'all'
   };
 }
@@ -168,14 +167,6 @@ export function Query() {
               <option value="unknown">{roleText.unknown}</option>
             </select>
           </label>
-          <label className="field">
-            <span>备注</span>
-            <input
-              name="noteKeyword"
-              value={draftFilters.noteKeyword}
-              onChange={(event) => updateDraftFilters({ ...draftFilters, noteKeyword: event.currentTarget.value })}
-            />
-          </label>
         </div>
         <div className="button-row query-actions">
           <button type="button" className="button button--ghost" onClick={resetFilters}>
@@ -276,7 +267,6 @@ function filtersFromForm(form: HTMLFormElement, fallback: QueryFilters): QueryFi
     keyword: String(values.get('keyword') ?? fallback.keyword),
     categoryId: String(values.get('categoryId') ?? fallback.categoryId),
     paymentMethodId: String(values.get('paymentMethodId') ?? fallback.paymentMethodId),
-    noteKeyword: String(values.get('noteKeyword') ?? fallback.noteKeyword),
     createdBy: parseCreatedBy(values.get('createdBy'), fallback.createdBy)
   };
 }

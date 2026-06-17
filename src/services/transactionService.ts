@@ -40,7 +40,6 @@ export async function softDeleteTransaction(transaction: Transaction): Promise<v
 
 export function filterTransactions(transactions: Transaction[], filters: QueryFilters, customers: Customer[] = []): Transaction[] {
   const keyword = filters.keyword.trim().toLowerCase();
-  const noteKeyword = filters.noteKeyword.trim().toLowerCase();
   const matchedCustomers = keyword
     ? customers.filter((customer) => {
         if (customer.deletedAt) return false;
@@ -64,7 +63,6 @@ export function filterTransactions(transactions: Transaction[], filters: QueryFi
       });
       if (!nameMatch && !phoneMatch && !customerMatch) return false;
     }
-    if (noteKeyword && !(row.note ?? '').toLowerCase().includes(noteKeyword)) return false;
     return true;
   });
 }
