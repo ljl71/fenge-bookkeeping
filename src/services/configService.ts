@@ -49,7 +49,7 @@ export async function saveServiceItem(
   if (!payload.name) throw new Error('请填写子项目名称');
   if (!payload.categoryId) throw new Error('请选择一级项目');
   if (input._id) {
-    await updateRecord<ServiceItem>('serviceItems', input._id, payload);
+    await updateRecord<ServiceItem>('serviceItems', input._id, payload, storeId);
     return { ...(input as ServiceItem), ...payload };
   }
   return addRecord<ServiceItem>('serviceItems', { ...payload, createdAt: now });
@@ -71,7 +71,7 @@ async function saveConfig<T extends ConfigRecord>(
   } as Partial<T>;
   if (!payload.name) throw new Error('请填写名称');
   if (input._id) {
-    await updateRecord<T>(collection as CollectionName, input._id, payload);
+    await updateRecord<T>(collection as CollectionName, input._id, payload, storeId);
     return { ...(input as T), ...payload };
   }
   return addRecord<T>(collection as CollectionName, { ...payload, createdAt: now } as Omit<T, '_id'>);
@@ -79,10 +79,10 @@ async function saveConfig<T extends ConfigRecord>(
 
 export async function toggleConfig<T extends ConfigRecord>(collection: ConfigCollection, row: T) {
   if (!row._id) throw new Error('缺少 ID，无法修改');
-  await updateRecord<T>(collection, row._id, { active: !row.active, updatedAt: nowIso() } as Partial<T>);
+  await updateRecord<T>(collection, row._id, { active: !row.active, updatedAt: nowIso() } as Partial<T>, row.storeId);
 }
 
 export async function softDeleteConfig<T extends ConfigRecord>(collection: ConfigCollection, row: T) {
   if (!row._id) throw new Error('缺少 ID，无法删除');
-  await updateRecord<T>(collection, row._id, { deletedAt: nowIso(), updatedAt: nowIso(), active: false } as Partial<T>);
+  await updateRecord<T>(collection, row._id, { deletedAt: nowIso(), updatedAt: nowIso(), active: false } as Partial<T>, row.storeId);
 }

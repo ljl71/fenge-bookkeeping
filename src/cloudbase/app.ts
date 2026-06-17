@@ -20,8 +20,10 @@ export async function ensureCloudbaseAuth() {
   if (!app) return;
   const auth = app.auth({ persistence: 'local' });
   try {
-    if (auth.hasLoginState?.()) return;
-    if (auth.getLoginState?.()) return;
+    const hasLoginState = auth.hasLoginState?.();
+    if (hasLoginState instanceof Promise ? await hasLoginState : hasLoginState) return;
+    const loginState = auth.getLoginState?.();
+    if (loginState instanceof Promise ? await loginState : loginState) return;
   } catch {
     // Continue to anonymous sign-in below.
   }

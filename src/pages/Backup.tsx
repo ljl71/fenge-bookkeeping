@@ -124,6 +124,7 @@ export function Backup() {
     const categoryName = row.categoryName.trim();
     const itemName = row.itemName?.trim() ?? '';
     const category = data.serviceCategories.find((item) => !item.deletedAt && item.name === categoryName);
+    if (!category?._id) throw new Error(`一级项目「${categoryName}」不存在，请先在项目管理中新增后再导入`);
     const serviceItem = itemName
       ? data.serviceItems.find(
           (item) =>
@@ -134,8 +135,8 @@ export function Backup() {
       : undefined;
 
     return {
-      categoryId: category?._id ?? '',
-      categoryName: category?.name ?? categoryName,
+      categoryId: category._id,
+      categoryName: category.name,
       itemId: serviceItem?._id,
       itemName: serviceItem?.name ?? itemName,
       amount: row.amount

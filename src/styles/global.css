@@ -383,6 +383,10 @@ textarea {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.segmented--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .segmented button {
   min-height: 40px;
   border: 0;
@@ -432,33 +436,47 @@ textarea {
 }
 
 .query-filter-panel {
-  gap: 9px;
+  gap: 8px;
 }
 
 .query-filter-panel .field,
 .query-filter-panel .field-group {
-  gap: 6px;
+  gap: 5px;
+}
+
+.query-filter-panel .field span,
+.query-filter-panel .field-label {
+  font-size: 14px;
 }
 
 .query-filter-panel input,
 .query-filter-panel select {
-  min-height: 43px;
-  padding: 8px 11px;
-  font-size: 16px;
+  min-height: 40px;
+  padding: 7px 10px;
+  font-size: 15px;
 }
 
 .query-filter-panel .segmented button {
   min-height: 37px;
 }
 
-.query-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+.query-filter-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.query-filter-grid__wide {
-  grid-column: 1 / -1;
+.query-filter-row {
+  display: grid;
+  gap: 8px;
+}
+
+.query-filter-row--main {
+  grid-template-columns: minmax(112px, 0.46fr) minmax(0, 1fr);
+}
+
+.query-filter-row--secondary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .export-menu {
@@ -630,8 +648,8 @@ textarea {
 
 .transaction-card__main {
   display: grid;
-  grid-template-columns: 44px 1fr;
-  gap: 8px;
+  grid-template-columns: 50px 1fr;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -641,15 +659,27 @@ textarea {
 
 .transaction-card__date {
   display: grid;
+  grid-template-rows: 1fr 1fr;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
   background: var(--blue-soft);
   color: var(--blue);
   border: 1px solid #d5e5ff;
   font-size: 14px;
   font-weight: 900;
+  line-height: 1;
+}
+
+.transaction-card__date span:first-child {
+  align-self: end;
+  font-size: 13px;
+}
+
+.transaction-card__date span:last-child {
+  align-self: start;
+  font-size: 15px;
 }
 
 .transaction-card p {
@@ -972,7 +1002,8 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .query-filter-grid {
+  .query-filter-row--main,
+  .query-filter-row--secondary {
     grid-template-columns: 1fr;
   }
 

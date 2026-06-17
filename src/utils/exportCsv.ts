@@ -1,13 +1,15 @@
 import type { Customer, Transaction } from '../types';
+import { purchaseItemsText } from './expense';
 
 function escapeCsv(value: unknown): string {
-  const text = String(value ?? '');
+  const raw = String(value ?? '');
+  const text = /^[=+\-@\t\r]/.test(raw.trimStart()) ? `'${raw}` : raw;
   if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
   return text;
 }
 
 export function itemsText(transaction: Transaction): string {
-  if (transaction.type === 'expense') return transaction.expenseCategoryName || '支出';
+  if (transaction.type === 'expense') return purchaseItemsText(transaction);
   return (transaction.items ?? [])
     .map((item) => `${item.categoryName}${item.itemName ? `/${item.itemName}` : ''}:${item.amount}`)
     .join('; ');

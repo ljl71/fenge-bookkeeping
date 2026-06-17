@@ -127,6 +127,7 @@ export interface AppData {
 export type DatePreset = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 export interface QueryFilters {
+  type: 'all' | TransactionType;
   preset: DatePreset;
   startDate: string;
   endDate: string;

@@ -7,7 +7,7 @@ import { PageHeader } from '../components/PageHeader';
 import { filterCustomers, saveCustomer } from '../services/customerService';
 import { customerStats } from '../utils/stats';
 import { formatMoney } from '../utils/money';
-import { maskPhone } from '../utils/phone';
+import { displayPhone } from '../utils/phone';
 
 const blankCustomer = { name: '', phone: '', note: '' };
 type CustomerDraft = Partial<Customer> & { name: string; phone: string };
@@ -106,7 +106,7 @@ export function Customers() {
               <article key={customer._id} className="customer-card">
                 <button type="button" className="customer-card__main" onClick={() => navigate('customerDetail', { id: customer._id ?? '' })}>
                   <strong>{customer.name}</strong>
-                  <span>{maskPhone(customer.phone)}</span>
+                  <span>{displayPhone(customer.phone)}</span>
                   <small>
                     累计 {formatMoney(stats.total)} · {stats.count} 次 · 最近 {stats.lastDate ?? '暂无'}
                   </small>

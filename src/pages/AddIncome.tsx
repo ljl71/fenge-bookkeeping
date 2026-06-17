@@ -8,7 +8,7 @@ import { activeOptions } from '../services/configService';
 import { findOrCreateCustomer } from '../services/customerService';
 import { createTransaction } from '../services/transactionService';
 import { todayString } from '../utils/date';
-import { formatMoney } from '../utils/money';
+import { formatMoney, sumMoney } from '../utils/money';
 import { normalizePhone } from '../utils/phone';
 
 const emptyItem = (): TransactionItem => ({
@@ -34,7 +34,8 @@ export function AddIncome() {
   const [date, setDate] = useState(todayString());
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const totalAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const validItems = items.filter((item) => item.categoryId && item.amount > 0);
+  const totalAmount = sumMoney(validItems.map((item) => item.amount));
 
   function pickCustomer(customer: Customer) {
     setCustomerName(customer.name);
@@ -47,9 +48,9 @@ export function AddIncome() {
     if (saving) return;
     setSaving(true);
     try {
-      const validItems = items.filter((item) => item.categoryId && item.amount > 0);
       if (!customerName.trim()) throw new Error('请填写顾客姓名');
       if (normalizePhone(customerPhone).length !== 11) throw new Error('请填写 11 位顾客手机号');
+      if (items.some((item) => !item.categoryId && item.amount > 0)) throw new Error('有项目已填写金额但未选择一级项目');
       if (!validItems.length) throw new Error('请至少添加一个消费项目');
       if (totalAmount <= 0) throw new Error('金额必须大于 0');
       const selectedPaymentId = paymentMethodId || defaultPayment?._id;

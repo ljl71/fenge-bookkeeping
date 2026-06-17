@@ -108,12 +108,14 @@ export const localDatabase = {
     write(db);
     return next;
   },
-  update<T extends { _id?: string }>(collection: CollectionName, id: string, patch: Partial<T>) {
+  update<T extends { _id?: string; storeId?: string }>(collection: CollectionName, id: string, patch: Partial<T>, storeId?: string) {
     const db = read();
     const rows = db[collection] as unknown as T[];
     const index = rows.findIndex((row) => row._id === id);
     if (index < 0) throw new Error('没有找到要更新的数据');
-    rows[index] = { ...rows[index], ...patch };
+    if (storeId && rows[index].storeId !== storeId) throw new Error('这条数据不属于当前店铺，已拒绝修改');
+    const { storeId: _storeId, ...safePatch } = patch;
+    rows[index] = { ...rows[index], ...(collection === 'stores' ? patch : safePatch) };
     write(db);
   },
   exportAll(storeId: string): DemoDb {

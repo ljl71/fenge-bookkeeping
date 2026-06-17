@@ -59,17 +59,26 @@ export async function cloudAdd<T extends { _id?: string }>(
 ): Promise<T> {
   const db = await getCloudbaseDb();
   if (!db) throw new Error('CloudBase 未配置，无法写入云端数据');
-  const result = await db.collection(collection).add(record);
-  return { ...(record as T), _id: result.id || result._id };
+  const { _id, ...payload } = record as T;
+  const result = await db.collection(collection).add(payload);
+  return { ...(payload as T), _id: result.id || result._id };
 }
 
-export async function cloudUpdate<T extends { _id?: string }>(
+export async function cloudUpdate<T extends { _id?: string; storeId?: string }>(
   collection: CollectionName,
   id: string,
-  patch: Partial<T>
+  patch: Partial<T>,
+  storeId?: string
 ): Promise<void> {
   const db = await getCloudbaseDb();
   if (!db) throw new Error('CloudBase 未配置，无法更新云端数据');
-  const { _id, ...payload } = patch;
-  await db.collection(collection).doc(id).update(payload);
+  const { _id, ...withoutId } = patch;
+  const { storeId: _storeId, ...withoutStoreId } = withoutId;
+  const payload = collection === 'stores' ? withoutId : withoutStoreId;
+  const target = storeId ? db.collection(collection).where({ _id: id, storeId }) : db.collection(collection).doc(id);
+  const result = await target.update(payload);
+  const updated = Number(result?.updated ?? result?.stats?.updated ?? result?.modified ?? Number.NaN);
+  if (Number.isFinite(updated) && updated <= 0) {
+    throw new Error('没有找到可修改的数据，可能已被删除或不属于当前店铺');
+  }
 }

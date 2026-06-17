@@ -14,10 +14,16 @@ interface TransactionCardProps {
 
 export function TransactionCard({ transaction, onEdit, onDelete }: TransactionCardProps) {
   const isIncome = transaction.type === 'income';
+  const dateLabel = monthDay(transaction.date);
+  const [dateMonth, dateDay] = dateLabel.split('-');
+
   return (
     <article className={`transaction-card ${isIncome ? 'is-income' : 'is-expense'}`}>
       <div className="transaction-card__main">
-        <span className="transaction-card__date">{monthDay(transaction.date)}</span>
+        <span className="transaction-card__date" aria-label={dateLabel}>
+          <span>{dateMonth}</span>
+          <span>{dateDay}</span>
+        </span>
         <div>
           <strong>{isIncome ? transaction.customerName || '收入' : '支出'}</strong>
           <p>{itemsText(transaction)}</p>

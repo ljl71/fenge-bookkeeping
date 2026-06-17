@@ -1,4 +1,4 @@
-import { PlusCircle, RefreshCw, Search, UsersRound } from 'lucide-react';
+import { MinusCircle, PlusCircle, RefreshCw, Search, UsersRound } from 'lucide-react';
 import { useApp } from '../AppContext';
 import { roleText } from '../constants/defaults';
 import { PageHeader } from '../components/PageHeader';
@@ -31,10 +31,14 @@ export function Dashboard() {
         }
       />
       {stale ? <div className="notice">当前可能不是最新数据，请检查网络后刷新。</div> : null}
-      <section className="quick-actions quick-actions--income">
+      <section className="quick-actions">
         <button type="button" className="button button--primary" onClick={() => navigate('bookkeeping', { tab: 'income' })}>
           <PlusCircle size={22} />
           记一笔收入
+        </button>
+        <button type="button" className="button button--secondary" onClick={() => navigate('bookkeeping', { tab: 'expense' })}>
+          <MinusCircle size={22} />
+          记一笔支出
         </button>
         <button type="button" className="button button--ghost" onClick={() => navigate('query')}>
           <Search size={20} />

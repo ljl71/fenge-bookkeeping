@@ -1,4 +1,5 @@
 import type { ExpenseCategory, PaymentMethod, ServiceCategory, ServiceItem, Store } from '../types';
+import { PURCHASE_EXPENSE_CATEGORY_ID, PURCHASE_EXPENSE_CATEGORY_NAME } from '../utils/expense';
 
 export const DEMO_PIN = '123456';
 export const DEMO_STORE_ID = 'fenge';
@@ -32,7 +33,7 @@ export function defaultStore(now: string): Store {
 }
 
 export const defaultServiceCategoryNames = ['睫毛', '美甲', '洗脸', '护肤', '产品', '办卡/充值', '其他'];
-export const defaultExpenseCategoryNames = ['材料', '进货', '房租', '水电', '工资', '杂费', '其他'];
+export const defaultExpenseCategoryNames = [PURCHASE_EXPENSE_CATEGORY_NAME];
 export const defaultPaymentMethodNames = ['微信', '支付宝', '现金', '其他'];
 
 export function defaultServiceCategories(storeId: string, now: string): ServiceCategory[] {
@@ -81,7 +82,7 @@ export function defaultServiceItems(storeId: string, categories: ServiceCategory
 
 export function defaultExpenseCategories(storeId: string, now: string): ExpenseCategory[] {
   return defaultExpenseCategoryNames.map((name, index) => ({
-    _id: `expense-category-${index + 1}`,
+    _id: name === PURCHASE_EXPENSE_CATEGORY_NAME ? PURCHASE_EXPENSE_CATEGORY_ID : `expense-category-${index + 1}`,
     storeId,
     name,
     sortOrder: index + 1,

@@ -1,5 +1,7 @@
 import type { Customer, StatsSummary, Transaction } from '../types';
 import { isBetweenDate, sortByDateDesc } from './date';
+import { isPurchaseExpense } from './expense';
+import { roundMoney, sumMoney } from './money';
 import { normalizePhone } from './phone';
 
 export function activeTransactions(transactions: Transaction[]): Transaction[] {
@@ -9,9 +11,9 @@ export function activeTransactions(transactions: Transaction[]): Transaction[] {
 export function summarize(transactions: Transaction[]): StatsSummary {
   const rows = activeTransactions(transactions);
   const incomeRows = rows.filter((row) => row.type === 'income');
-  const expenseRows = rows.filter((row) => row.type === 'expense');
-  const income = incomeRows.reduce((sum, row) => sum + row.totalAmount, 0);
-  const expense = expenseRows.reduce((sum, row) => sum + row.totalAmount, 0);
+  const expenseRows = rows.filter(isPurchaseExpense);
+  const income = sumMoney(incomeRows.map((row) => row.totalAmount));
+  const expense = sumMoney(expenseRows.map((row) => row.totalAmount));
   const customerIds = new Set(incomeRows.map((row) => row.customerId || row.customerName).filter(Boolean));
   return {
     total: rows.length,
@@ -21,7 +23,7 @@ export function summarize(transactions: Transaction[]): StatsSummary {
     incomeCount: incomeRows.length,
     expenseCount: expenseRows.length,
     customerCount: customerIds.size,
-    averageTicket: incomeRows.length ? income / incomeRows.length : 0
+    averageTicket: incomeRows.length ? roundMoney(income / incomeRows.length) : 0
   };
 }
 
@@ -40,7 +42,7 @@ export function customerStats(customer: Customer, transactions: Transaction[]) {
           row.customerName === customer.name)
     )
   );
-  const total = rows.reduce((sum, row) => sum + row.totalAmount, 0);
+  const total = sumMoney(rows.map((row) => row.totalAmount));
   const itemCounts = new Map<string, number>();
   rows.forEach((row) => {
     (row.items ?? []).forEach((item) => {
@@ -60,10 +62,11 @@ export function customerStats(customer: Customer, transactions: Transaction[]) {
 export function groupAmount<T extends Transaction>(rows: T[], getKey: (row: T) => string | undefined) {
   const result = new Map<string, { name: string; income: number; expense: number; count: number; customers: Set<string> }>();
   rows.forEach((row) => {
+    if (row.type === 'expense' && !isPurchaseExpense(row)) return;
     const key = getKey(row) || '未分类';
     const current = result.get(key) ?? { name: key, income: 0, expense: 0, count: 0, customers: new Set<string>() };
-    if (row.type === 'income') current.income += row.totalAmount;
-    if (row.type === 'expense') current.expense += row.totalAmount;
+    if (row.type === 'income') current.income = sumMoney([current.income, row.totalAmount]);
+    if (isPurchaseExpense(row)) current.expense = sumMoney([current.expense, row.totalAmount]);
     current.count += 1;
     if (row.customerName) current.customers.add(row.customerName);
     result.set(key, current);

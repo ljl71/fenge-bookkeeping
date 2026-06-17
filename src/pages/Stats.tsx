@@ -6,6 +6,7 @@ import { DateRangePicker } from '../components/DateRangePicker';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { getDateRange, sortByDateDesc } from '../utils/date';
+import { isPurchaseExpense, purchaseItemName } from '../utils/expense';
 import { itemsText } from '../utils/exportCsv';
 import { formatMoney } from '../utils/money';
 import { maskPhone } from '../utils/phone';
@@ -33,17 +34,19 @@ export function Stats() {
   const [startDate, setStartDate] = useState(initial.startDate);
   const [endDate, setEndDate] = useState(initial.endDate);
 
-  const rows = useMemo(
-    () => inDateRange(data.transactions, startDate, endDate).filter((row) => row.type === 'income'),
+  const rangeRows = useMemo(
+    () => inDateRange(data.transactions, startDate, endDate),
     [data.transactions, startDate, endDate]
   );
-  const stats = summarize(rows);
-  const categoryRows = rows.flatMap((row) =>
+  const incomeRows = useMemo(() => rangeRows.filter((row) => row.type === 'income'), [rangeRows]);
+  const purchaseRows = useMemo(() => rangeRows.filter(isPurchaseExpense), [rangeRows]);
+  const stats = summarize(rangeRows);
+  const categoryRows = incomeRows.flatMap((row) =>
     row.type === 'income'
       ? (row.items ?? []).map((item) => ({ ...row, totalAmount: item.amount, statKey: item.categoryName }))
       : []
   ) as Array<Transaction & { statKey: string }>;
-  const itemRows = rows.flatMap((row) =>
+  const itemRows = incomeRows.flatMap((row) =>
     row.type === 'income'
       ? (row.items ?? []).map((item) => ({
           ...row,
@@ -60,13 +63,21 @@ export function Stats() {
     itemRows,
     (row) => row.statKey
   );
-  const byPayment = groupAmount(rows, (row) => row.paymentMethodName);
+  const purchaseItemRows = purchaseRows.flatMap((row) =>
+    (row.items?.length ? row.items : [{ itemName: row.expenseCategoryName, amount: row.totalAmount }]).map((item) => ({
+      ...row,
+      totalAmount: item.amount,
+      statKey: purchaseItemName(item)
+    }))
+  ) as Array<Transaction & { statKey: string }>;
+  const byPurchaseItem = groupAmount(purchaseItemRows, (row) => row.statKey);
+  const byPayment = groupAmount(rangeRows, (row) => row.paymentMethodName);
   const customerRank = data.customers
-    .map((customer) => ({ customer, stats: customerStats(customer, rows) }))
+    .map((customer) => ({ customer, stats: customerStats(customer, incomeRows) }))
     .filter((row) => row.stats.count > 0)
     .sort((a, b) => b.stats.total - a.stats.total)
     .slice(0, 10);
-  const recentCustomers = sortByDateDesc(rows.filter((row) => row.type === 'income')).reduce<
+  const recentCustomers = sortByDateDesc(incomeRows).reduce<
     Array<{ transaction: Transaction; customerId: string }>
   >((result, transaction) => {
     const customer =
@@ -120,13 +131,13 @@ export function Stats() {
           总收入<strong>{formatMoney(stats.income)}</strong>
         </span>
         <span>
-          收入笔数<strong>{stats.incomeCount} 笔</strong>
+          总支出<strong>{formatMoney(stats.expense)}</strong>
+        </span>
+        <span>
+          净收入<strong>{formatMoney(stats.net)}</strong>
         </span>
         <span>
           顾客数<strong>{stats.customerCount} 位</strong>
-        </span>
-        <span>
-          客单价<strong>{formatMoney(stats.averageTicket)}</strong>
         </span>
       </div>
       <section className="panel">
@@ -155,12 +166,29 @@ export function Stats() {
             {byPayment.map((row) => (
               <div key={row.name}>
                 <span>{row.name}</span>
-                <strong>{formatMoney(row.income)}</strong>
+                <strong>
+                  收 {formatMoney(row.income)} · 支 {formatMoney(row.expense)}
+                </strong>
               </div>
             ))}
           </div>
         ) : (
           <EmptyState />
+        )}
+      </section>
+      <section className="panel">
+        <h2>按进货货品统计支出</h2>
+        {byPurchaseItem.length ? (
+          <div className="table-list">
+            {byPurchaseItem.map((row) => (
+              <div key={row.name}>
+                <span>{row.name}</span>
+                <strong>{formatMoney(row.expense)}</strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="暂无进货支出" />
         )}
       </section>
       <section className="panel">

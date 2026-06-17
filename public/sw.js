@@ -25,16 +25,23 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const isNavigation = request.mode === 'navigate';
+  const url = new URL(request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+
+  if (!isNavigation && !isSameOrigin) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok) {
+        if (response.ok && (isNavigation || isSameOrigin)) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(isNavigation ? '/index.html' : request, copy));
         }
         return response;
       })
-      .catch(() => caches.match(isNavigation ? '/index.html' : request).then((cached) => cached || caches.match('/index.html')))
+      .catch(() => {
+        if (isNavigation) return caches.match('/index.html');
+        return caches.match(request);
+      })
   );
 });

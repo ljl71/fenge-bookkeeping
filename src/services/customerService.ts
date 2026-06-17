@@ -37,7 +37,7 @@ export async function saveCustomer(storeId: string, input: Partial<Customer> & {
   };
 
   if (input._id) {
-    await updateRecord<Customer>('customers', input._id, payload);
+    await updateRecord<Customer>('customers', input._id, payload, storeId);
     return { ...(input as Customer), ...payload };
   }
 
@@ -49,7 +49,7 @@ export async function saveCustomer(storeId: string, input: Partial<Customer> & {
 
 export async function softDeleteCustomer(customer: Customer) {
   if (!customer._id) throw new Error('顾客缺少 ID，无法删除');
-  await updateRecord<Customer>('customers', customer._id, { deletedAt: nowIso(), updatedAt: nowIso() });
+  await updateRecord<Customer>('customers', customer._id, { deletedAt: nowIso(), updatedAt: nowIso() }, customer.storeId);
 }
 
 export async function findOrCreateCustomer(storeId: string, input: { name: string; phone?: string; note?: string }) {
@@ -76,7 +76,7 @@ export async function findOrCreateCustomer(storeId: string, input: { name: strin
     if (nextNote && !found.note) patch.note = nextNote;
     if (Object.keys(patch).length && found._id) {
       patch.updatedAt = nowIso();
-      await updateRecord<Customer>('customers', found._id, patch);
+      await updateRecord<Customer>('customers', found._id, patch, storeId);
       return { ...found, ...patch };
     }
     return found;

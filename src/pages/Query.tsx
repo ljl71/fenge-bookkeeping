@@ -18,6 +18,7 @@ import { summarize } from '../utils/stats';
 function defaultFilters(): QueryFilters {
   const range = getDateRange('month');
   return {
+    type: 'all',
     preset: 'month',
     startDate: range.startDate,
     endDate: range.endDate,
@@ -84,6 +85,10 @@ export function Query() {
   }
 
   function exportExcel() {
+    if (rows.some((row) => row.type === 'expense')) {
+      setToast({ kind: 'error', message: 'Excel 模板只支持收入流水；当前结果含支出，请改用 CSV/JSON 或筛选收入后导出' });
+      return;
+    }
     downloadBlob(`fenge-query-${appliedFilters.startDate}-${appliedFilters.endDate}.xlsx`, makeFengeWorkbook(rows, involvedCustomers));
     setExportOpen(false);
     setToast({ kind: 'success', message: '已导出 Excel' });
@@ -109,7 +114,7 @@ export function Query() {
 
   return (
     <div className="page">
-      <PageHeader title="查询" subtitle="按顾客姓名或手机号查收入流水。" />
+      <PageHeader title="查询" subtitle="按日期、类型、顾客、货品或项目查询流水。" />
       <form ref={formRef} className="panel query-filter-panel" onSubmit={submitQuery}>
         <DateRangePicker
           preset={draftFilters.preset}
@@ -119,54 +124,73 @@ export function Query() {
           onStartChange={(startDate) => updateDraftFilters({ ...draftFilters, startDate, preset: 'custom' })}
           onEndChange={(endDate) => updateDraftFilters({ ...draftFilters, endDate, preset: 'custom' })}
         />
-        <div className="query-filter-grid">
-          <label className="field query-filter-grid__wide">
-            <span>顾客姓名 / 手机号 / 后四位</span>
-            <input
-              name="keyword"
-              value={draftFilters.keyword}
-              onChange={(event) => updateDraftFilters({ ...draftFilters, keyword: event.currentTarget.value })}
-            />
-          </label>
-          <label className="field">
-            <span>一级项目</span>
-            <select name="categoryId" value={draftFilters.categoryId} onChange={(event) => updateDraftFilters({ ...draftFilters, categoryId: event.target.value })}>
-              <option value="">全部</option>
-              {data.serviceCategories.filter((category) => !category.deletedAt).map((category) => (
-                <option key={category._id} value={category._id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>支付方式</span>
-            <select
-              name="paymentMethodId"
-              value={draftFilters.paymentMethodId}
-              onChange={(event) => updateDraftFilters({ ...draftFilters, paymentMethodId: event.target.value })}
-            >
-              <option value="">全部</option>
-              {data.paymentMethods.filter((method) => !method.deletedAt).map((method) => (
-                <option key={method._id} value={method._id}>
-                  {method.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>记账人</span>
-            <select
-              name="createdBy"
-              value={draftFilters.createdBy}
-              onChange={(event) => updateDraftFilters({ ...draftFilters, createdBy: event.target.value as QueryFilters['createdBy'] })}
-            >
-              <option value="all">全部</option>
-              <option value="mom">{roleText.mom}</option>
-              <option value="dad">{roleText.dad}</option>
-              <option value="unknown">{roleText.unknown}</option>
-            </select>
-          </label>
+        <div className="query-filter-compact">
+          <div className="query-filter-row query-filter-row--main">
+            <label className="field">
+              <span>流水类型</span>
+              <select
+                name="type"
+                value={draftFilters.type}
+                onChange={(event) => {
+                  const type = event.target.value as QueryFilters['type'];
+                  updateDraftFilters({ ...draftFilters, type, categoryId: type === 'expense' ? '' : draftFilters.categoryId });
+                }}
+              >
+                <option value="all">全部</option>
+                <option value="income">收入</option>
+                <option value="expense">支出</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>顾客姓名 / 手机号 / 货品 / 备注</span>
+              <input
+                name="keyword"
+                value={draftFilters.keyword}
+                onChange={(event) => updateDraftFilters({ ...draftFilters, keyword: event.currentTarget.value })}
+              />
+            </label>
+          </div>
+          <div className="query-filter-row query-filter-row--secondary">
+            <label className="field">
+              <span>收入一级项目</span>
+              <select name="categoryId" value={draftFilters.categoryId} onChange={(event) => updateDraftFilters({ ...draftFilters, categoryId: event.target.value })}>
+                <option value="">全部</option>
+                {data.serviceCategories.filter((category) => !category.deletedAt).map((category) => (
+                  <option key={category._id} value={category._id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>支付方式</span>
+              <select
+                name="paymentMethodId"
+                value={draftFilters.paymentMethodId}
+                onChange={(event) => updateDraftFilters({ ...draftFilters, paymentMethodId: event.target.value })}
+              >
+                <option value="">全部</option>
+                {data.paymentMethods.filter((method) => !method.deletedAt).map((method) => (
+                  <option key={method._id} value={method._id}>
+                    {method.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>记账人</span>
+              <select
+                name="createdBy"
+                value={draftFilters.createdBy}
+                onChange={(event) => updateDraftFilters({ ...draftFilters, createdBy: event.target.value as QueryFilters['createdBy'] })}
+              >
+                <option value="all">全部</option>
+                <option value="mom">{roleText.mom}</option>
+                <option value="dad">{roleText.dad}</option>
+                <option value="unknown">{roleText.unknown}</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div className="button-row query-actions">
           <button type="button" className="button button--ghost" onClick={resetFilters}>
@@ -207,16 +231,16 @@ export function Query() {
         <h2 className="section-title">查询统计</h2>
         <div className="query-stat-strip">
           <span>
-            收入笔数<strong>{stats.incomeCount} 笔</strong>
+            流水<strong>{stats.total} 笔</strong>
           </span>
           <span>
-            总收入<strong>{formatMoney(stats.income)}</strong>
+            收入<strong>{formatMoney(stats.income)}</strong>
           </span>
           <span>
-            顾客<strong>{stats.customerCount} 位</strong>
+            支出<strong>{formatMoney(stats.expense)}</strong>
           </span>
           <span>
-            客单价<strong>{formatMoney(stats.averageTicket)}</strong>
+            净额<strong>{formatMoney(stats.net)}</strong>
           </span>
         </div>
       </section>
@@ -265,13 +289,20 @@ function customersForRows(rows: Transaction[], customers: Customer[]) {
 
 function filtersFromForm(form: HTMLFormElement, fallback: QueryFilters): QueryFilters {
   const values = new FormData(form);
+  const type = parseTransactionType(values.get('type'), fallback.type);
   return {
     ...fallback,
+    type,
     keyword: String(values.get('keyword') ?? fallback.keyword),
-    categoryId: String(values.get('categoryId') ?? fallback.categoryId),
+    categoryId: type === 'expense' ? '' : String(values.get('categoryId') ?? fallback.categoryId),
     paymentMethodId: String(values.get('paymentMethodId') ?? fallback.paymentMethodId),
     createdBy: parseCreatedBy(values.get('createdBy'), fallback.createdBy)
   };
+}
+
+function parseTransactionType(value: FormDataEntryValue | null, fallback: QueryFilters['type']): QueryFilters['type'] {
+  if (value === 'all' || value === 'income' || value === 'expense') return value;
+  return fallback;
 }
 
 function parseCreatedBy(value: FormDataEntryValue | null, fallback: QueryFilters['createdBy']): QueryFilters['createdBy'] {

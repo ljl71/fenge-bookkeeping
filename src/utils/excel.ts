@@ -1,4 +1,5 @@
 import type { Customer, Role, Transaction } from '../types';
+import { roundMoney } from './money';
 
 type ExcelValue = string | number | boolean | null | undefined;
 
@@ -32,6 +33,7 @@ export interface FengeWorkbookRows {
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8');
+const MAX_WORKBOOK_BYTES = 8 * 1024 * 1024;
 
 const INCOME_HEADERS = ['日期', '顾客姓名', '手机号', '一级项目', '子项目', '金额', '支付方式', '备注', '记账人'];
 const CUSTOMER_HEADERS = ['姓名', '手机号', '备注'];
@@ -83,6 +85,7 @@ export function makeFengeWorkbook(transactions: Transaction[], customers: Custom
 }
 
 export async function parseFengeWorkbook(file: File): Promise<FengeWorkbookRows> {
+  if (file.size > MAX_WORKBOOK_BYTES) throw new Error('Excel 文件过大，请拆分为 8MB 以内后再导入');
   const sheets = await readWorkbookSheets(new Uint8Array(await file.arrayBuffer()));
   return {
     incomes: parseIncomeRows(sheets['收入流水'] ?? sheets['流水'] ?? []),
@@ -385,7 +388,7 @@ function pickCell(row: Record<string, string>, aliases: string[]): string {
 
 function parseAmount(value: string): number {
   const amount = Number(value.replace(/[,\s¥￥]/g, ''));
-  return Number.isFinite(amount) ? amount : 0;
+  return Number.isFinite(amount) ? roundMoney(amount) : 0;
 }
 
 function normalizeDate(value: string): string {
