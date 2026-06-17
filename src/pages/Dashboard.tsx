@@ -80,7 +80,10 @@ export function Dashboard() {
         </div>
       </section>
       <section>
-        <h2 className="section-title">本月流水</h2>
+        <div className="section-title-row">
+          <h2 className="section-title">本月流水</h2>
+          <span>共 {monthLedger.length} 条</span>
+        </div>
         {monthLedger.length ? (
           <div className="scroll-panel dashboard-ledger-scroll">
             {monthLedger.map((transaction) => (

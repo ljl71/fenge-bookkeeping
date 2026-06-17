@@ -136,6 +136,25 @@ small {
   margin-bottom: 10px;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.section-title-row .section-title {
+  margin-bottom: 0;
+}
+
+.section-title-row span {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .panel,
 .summary-card,
 .transaction-card,
