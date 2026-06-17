@@ -221,9 +221,12 @@ export function Query() {
         </div>
       </section>
       <section>
-        <h2 className="section-title">查询明细</h2>
+        <div className="section-title-row">
+          <h2 className="section-title">查询明细</h2>
+          <span>共 {rows.length} 条</span>
+        </div>
         {rows.length ? (
-          <div className="stack">
+          <div className="scroll-panel query-ledger-scroll">
             {rows.map((transaction) => (
               <TransactionCard
                 key={transaction._id}
