@@ -55,10 +55,16 @@ export function customersToCsv(customers: Customer[]): string {
 
 export function downloadText(filename: string, content: string, type = 'text/plain;charset=utf-8') {
   const blob = new Blob([content], { type });
+  downloadBlob(filename, blob);
+}
+
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }

@@ -5,7 +5,6 @@ import type { DatePreset, Transaction } from '../types';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
-import { SummaryCard } from '../components/SummaryCard';
 import { getDateRange, sortByDateDesc } from '../utils/date';
 import { itemsText } from '../utils/exportCsv';
 import { formatMoney } from '../utils/money';
@@ -34,7 +33,10 @@ export function Stats() {
   const [startDate, setStartDate] = useState(initial.startDate);
   const [endDate, setEndDate] = useState(initial.endDate);
 
-  const rows = useMemo(() => inDateRange(data.transactions, startDate, endDate), [data.transactions, startDate, endDate]);
+  const rows = useMemo(
+    () => inDateRange(data.transactions, startDate, endDate).filter((row) => row.type === 'income'),
+    [data.transactions, startDate, endDate]
+  );
   const stats = summarize(rows);
   const categoryRows = rows.flatMap((row) =>
     row.type === 'income'
@@ -59,7 +61,6 @@ export function Stats() {
     (row) => row.statKey
   );
   const byPayment = groupAmount(rows, (row) => row.paymentMethodName);
-  const byExpense = groupAmount(rows.filter((row) => row.type === 'expense'), (row) => row.expenseCategoryName);
   const customerRank = data.customers
     .map((customer) => ({ customer, stats: customerStats(customer, rows) }))
     .filter((row) => row.stats.count > 0)
@@ -114,14 +115,19 @@ export function Stats() {
           }}
         />
       </section>
-      <div className="summary-grid">
-        <SummaryCard label="总收入" value={formatMoney(stats.income)} tone="income" />
-        <SummaryCard label="总支出" value={formatMoney(stats.expense)} tone="expense" />
-        <SummaryCard label="净收入" value={formatMoney(stats.net)} tone={stats.net >= 0 ? 'income' : 'expense'} />
-        <SummaryCard label="收入笔数" value={`${stats.incomeCount} 笔`} />
-        <SummaryCard label="支出笔数" value={`${stats.expenseCount} 笔`} />
-        <SummaryCard label="顾客数" value={`${stats.customerCount} 位`} />
-        <SummaryCard label="平均客单价" value={formatMoney(stats.averageTicket)} />
+      <div className="query-stat-strip stats-stat-strip">
+        <span>
+          总收入<strong>{formatMoney(stats.income)}</strong>
+        </span>
+        <span>
+          收入笔数<strong>{stats.incomeCount} 笔</strong>
+        </span>
+        <span>
+          顾客数<strong>{stats.customerCount} 位</strong>
+        </span>
+        <span>
+          客单价<strong>{formatMoney(stats.averageTicket)}</strong>
+        </span>
       </div>
       <section className="panel">
         <h2>按一级项目统计收入</h2>
@@ -149,24 +155,7 @@ export function Stats() {
             {byPayment.map((row) => (
               <div key={row.name}>
                 <span>{row.name}</span>
-                <strong>
-                  收 {formatMoney(row.income)} / 支 {formatMoney(row.expense)}
-                </strong>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState />
-        )}
-      </section>
-      <section className="panel">
-        <h2>按支出类别统计</h2>
-        {byExpense.length ? (
-          <div className="table-list">
-            {byExpense.map((row) => (
-              <div key={row.name}>
-                <span>{row.name}</span>
-                <strong>{formatMoney(row.expense)}</strong>
+                <strong>{formatMoney(row.income)}</strong>
               </div>
             ))}
           </div>

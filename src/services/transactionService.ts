@@ -1,4 +1,4 @@
-import type { QueryFilters, Transaction } from '../types';
+import type { Customer, QueryFilters, Transaction } from '../types';
 import { nowIso } from '../utils/date';
 import { normalizePhone, phoneMatches } from '../utils/phone';
 import { addRecord, listCollection, updateRecord } from './dataSource';
@@ -38,22 +38,31 @@ export async function softDeleteTransaction(transaction: Transaction): Promise<v
   });
 }
 
-export function filterTransactions(transactions: Transaction[], filters: QueryFilters): Transaction[] {
+export function filterTransactions(transactions: Transaction[], filters: QueryFilters, customers: Customer[] = []): Transaction[] {
   const keyword = filters.keyword.trim().toLowerCase();
   const noteKeyword = filters.noteKeyword.trim().toLowerCase();
+  const matchedCustomers = keyword
+    ? customers.filter((customer) => {
+        if (customer.deletedAt) return false;
+        return customer.name.toLowerCase().includes(keyword) || phoneMatches(customer.phone, keyword);
+      })
+    : [];
   return transactions.filter((row) => {
     if (row.deletedAt) return false;
+    if (row.type !== 'income') return false;
     if (row.date < filters.startDate || row.date > filters.endDate) return false;
-    if (filters.type !== 'all' && row.type !== filters.type) return false;
     if (filters.createdBy !== 'all' && row.createdBy !== filters.createdBy) return false;
     if (filters.paymentMethodId && row.paymentMethodId !== filters.paymentMethodId) return false;
-    if (filters.expenseCategoryId && row.expenseCategoryId !== filters.expenseCategoryId) return false;
     if (filters.categoryId && !(row.items ?? []).some((item) => item.categoryId === filters.categoryId)) return false;
-    if (filters.itemId && !(row.items ?? []).some((item) => item.itemId === filters.itemId)) return false;
     if (keyword) {
       const nameMatch = (row.customerName ?? '').toLowerCase().includes(keyword);
       const phoneMatch = phoneMatches(row.customerPhone, keyword);
-      if (!nameMatch && !phoneMatch) return false;
+      const customerMatch = matchedCustomers.some((customer) => {
+        if (customer._id && row.customerId === customer._id) return true;
+        if (customer.phone && row.customerPhone && normalizePhone(customer.phone) === normalizePhone(row.customerPhone)) return true;
+        return Boolean(customer.name && row.customerName && customer.name === row.customerName);
+      });
+      if (!nameMatch && !phoneMatch && !customerMatch) return false;
     }
     if (noteKeyword && !(row.note ?? '').toLowerCase().includes(noteKeyword)) return false;
     return true;

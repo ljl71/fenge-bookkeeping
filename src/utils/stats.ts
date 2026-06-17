@@ -1,5 +1,6 @@
 import type { Customer, StatsSummary, Transaction } from '../types';
 import { isBetweenDate, sortByDateDesc } from './date';
+import { normalizePhone } from './phone';
 
 export function activeTransactions(transactions: Transaction[]): Transaction[] {
   return transactions.filter((row) => !row.deletedAt);
@@ -29,9 +30,14 @@ export function inDateRange(transactions: Transaction[], startDate: string, endD
 }
 
 export function customerStats(customer: Customer, transactions: Transaction[]) {
+  const customerPhone = normalizePhone(customer.phone);
   const rows = sortByDateDesc(
     activeTransactions(transactions).filter(
-      (row) => row.type === 'income' && (row.customerId === customer._id || row.customerName === customer.name)
+      (row) =>
+        row.type === 'income' &&
+        (row.customerId === customer._id ||
+          (customerPhone && normalizePhone(row.customerPhone) === customerPhone) ||
+          row.customerName === customer.name)
     )
   );
   const total = rows.reduce((sum, row) => sum + row.totalAmount, 0);

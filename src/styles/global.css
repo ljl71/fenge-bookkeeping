@@ -285,6 +285,10 @@ textarea {
   gap: 10px;
 }
 
+.quick-actions--income .button--primary {
+  grid-column: 1 / -1;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -332,6 +336,114 @@ textarea {
 
 .button-row .button {
   flex: 1;
+}
+
+.query-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: 8px;
+}
+
+.query-filter-panel {
+  gap: 10px;
+}
+
+.query-filter-panel .field,
+.query-filter-panel .field-group {
+  gap: 6px;
+}
+
+.query-filter-panel input,
+.query-filter-panel select {
+  min-height: 44px;
+  padding: 9px 11px;
+  font-size: 16px;
+}
+
+.query-filter-panel .segmented button {
+  min-height: 38px;
+}
+
+.query-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.query-filter-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.export-menu {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.export-menu button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #2f3137;
+  font-weight: 800;
+}
+
+.query-stat-strip,
+.dashboard-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.query-stat-strip span,
+.dashboard-stat-strip span {
+  min-height: 58px;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.query-stat-strip strong,
+.dashboard-stat-strip strong {
+  color: #2f3137;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.dashboard-stat-strip span {
+  min-height: 54px;
+  padding: 7px 9px;
+}
+
+.scroll-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.dashboard-ledger-scroll {
+  max-height: min(46vh, 420px);
 }
 
 .chip-grid {
@@ -392,38 +504,49 @@ textarea {
 .customer-card {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
 }
 
 .transaction-card__main {
   display: grid;
-  grid-template-columns: 54px 1fr;
-  gap: 10px;
+  grid-template-columns: 46px 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transaction-card__main > div {
   min-width: 0;
 }
 
 .transaction-card__date {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   background: var(--blue-soft);
   color: var(--blue);
+  font-size: 15px;
   font-weight: 900;
 }
 
 .transaction-card p {
-  margin-top: 4px;
+  margin-top: 2px;
   color: #3c424d;
+}
+
+.transaction-card p,
+.transaction-card small {
+  overflow-wrap: anywhere;
 }
 
 .transaction-card__side {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  justify-content: space-between;
+  gap: 8px;
   flex: 0 0 auto;
 }
 
@@ -442,8 +565,8 @@ textarea {
 }
 
 .icon-button {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
@@ -596,6 +719,10 @@ textarea {
   gap: 10px;
 }
 
+.file-input-hidden {
+  display: none;
+}
+
 .config-list > div {
   min-height: 54px;
   display: flex;
@@ -623,6 +750,10 @@ textarea {
 
 .inline-form select {
   grid-column: 1 / -1;
+}
+
+.inline-form--service-item {
+  grid-template-columns: 1fr 90px 64px auto;
 }
 
 .table-list {
@@ -698,8 +829,27 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .inline-form {
+  .inline-form,
+  .inline-form--service-item {
     grid-template-columns: 1fr;
+  }
+
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .query-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .query-actions,
+  .export-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .query-stat-strip,
+  .dashboard-stat-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .page-header {

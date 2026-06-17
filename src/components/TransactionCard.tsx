@@ -2,8 +2,8 @@ import { Edit3, Trash2 } from 'lucide-react';
 import type { Transaction } from '../types';
 import { monthDay } from '../utils/date';
 import { itemsText } from '../utils/exportCsv';
-import { formatMoney, signedMoney } from '../utils/money';
-import { maskPhone } from '../utils/phone';
+import { signedMoney } from '../utils/money';
+import { displayPhone } from '../utils/phone';
 import { roleText } from '../constants/defaults';
 
 interface TransactionCardProps {
@@ -22,14 +22,13 @@ export function TransactionCard({ transaction, onEdit, onDelete }: TransactionCa
           <strong>{isIncome ? transaction.customerName || '收入' : '支出'}</strong>
           <p>{itemsText(transaction)}</p>
           <small>
-            {isIncome ? maskPhone(transaction.customerPhone) : transaction.expenseCategoryName} ·{' '}
+            {isIncome ? displayPhone(transaction.customerPhone) : transaction.expenseCategoryName} ·{' '}
             {transaction.paymentMethodName} · {roleText[transaction.createdBy ?? 'unknown']}
           </small>
         </div>
       </div>
       <div className="transaction-card__side">
         <strong>{isIncome ? signedMoney('income', transaction.totalAmount) : signedMoney('expense', transaction.totalAmount)}</strong>
-        <small>{formatMoney(transaction.totalAmount)}</small>
         <div className="icon-actions">
           {onEdit ? (
             <button type="button" className="icon-button" onClick={() => onEdit(transaction)} aria-label="编辑流水" title="编辑">

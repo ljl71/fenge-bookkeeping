@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { ArrowLeft, Edit3, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../AppContext';
-import type { ExpenseCategory, PaymentMethod, ServiceCategory, ServiceItem } from '../types';
+import type { PaymentMethod, ServiceCategory, ServiceItem } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { PageHeader } from '../components/PageHeader';
 import {
-  saveExpenseCategory,
   savePaymentMethod,
   saveServiceCategory,
   saveServiceItem,
@@ -16,14 +15,12 @@ import {
 type DeleteTarget =
   | { collection: 'serviceCategories'; row: ServiceCategory }
   | { collection: 'serviceItems'; row: ServiceItem }
-  | { collection: 'expenseCategories'; row: ExpenseCategory }
   | { collection: 'paymentMethods'; row: PaymentMethod };
 
 export function ProjectManagement() {
   const { session, data, refreshData, navigate, setToast } = useApp();
   const [serviceCategory, setServiceCategory] = useState<Partial<ServiceCategory>>({ name: '', sortOrder: 99, active: true });
   const [serviceItem, setServiceItem] = useState<Partial<ServiceItem>>({ name: '', categoryId: '', defaultPrice: 0, sortOrder: 99, active: true });
-  const [expenseCategory, setExpenseCategory] = useState<Partial<ExpenseCategory>>({ name: '', sortOrder: 99, active: true });
   const [paymentMethod, setPaymentMethod] = useState<Partial<PaymentMethod>>({ name: '', sortOrder: 99, active: true });
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
@@ -57,7 +54,7 @@ export function ProjectManagement() {
       />
       <ConfigSection title="收入一级项目">
         <form
-          className="inline-form"
+          className="inline-form inline-form--service-item"
           onSubmit={(event) => {
             event.preventDefault();
             run(
@@ -144,19 +141,6 @@ export function ProjectManagement() {
           onEdit={setServiceItem}
           onToggle={(row) => run(() => toggleConfig('serviceItems', row), row.active ? '已停用' : '已启用')}
           onDelete={(row) => setDeleteTarget({ collection: 'serviceItems', row })}
-        />
-      </ConfigSection>
-
-      <ConfigSection title="支出类别">
-        <SimpleConfigForm value={expenseCategory} onChange={setExpenseCategory} onSubmit={() => run(async () => {
-          await saveExpenseCategory(session.storeId, { ...expenseCategory, name: expenseCategory.name ?? '' });
-          setExpenseCategory({ name: '', sortOrder: 99, active: true });
-        }, '支出类别已保存')} />
-        <ConfigList
-          rows={data.expenseCategories}
-          onEdit={setExpenseCategory}
-          onToggle={(row) => run(() => toggleConfig('expenseCategories', row), row.active ? '已停用' : '已启用')}
-          onDelete={(row) => setDeleteTarget({ collection: 'expenseCategories', row })}
         />
       </ConfigSection>
 

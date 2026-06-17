@@ -9,9 +9,13 @@ export function maskPhone(phone?: string): string {
   return `${normalized.slice(0, 3)}****${normalized.slice(-4)}`;
 }
 
+export function displayPhone(phone?: string): string {
+  return normalizePhone(phone) || '未填写';
+}
+
 export function phoneMatches(phone: string | undefined, keyword: string): boolean {
   const source = normalizePhone(phone);
   const target = normalizePhone(keyword);
-  if (!target) return true;
+  if (!target) return false;
   return source.includes(target) || source.slice(-4) === target;
 }

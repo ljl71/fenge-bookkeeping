@@ -36,11 +36,11 @@ export function Settings() {
         </button>
         <button type="button" onClick={() => navigate('projects')}>
           <Boxes size={22} />
-          <span>项目 / 类别 / 支付方式管理</span>
+          <span>项目 / 支付方式管理</span>
         </button>
         <button type="button" onClick={() => navigate('backup')}>
           <Download size={22} />
-          <span>备份导出</span>
+          <span>备份导入导出</span>
         </button>
         <button type="button" onClick={refreshData}>
           <RefreshCw size={22} />

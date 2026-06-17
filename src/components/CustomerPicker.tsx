@@ -32,11 +32,11 @@ export function CustomerPicker({
         <input value={name} placeholder="例如 王姐" onChange={(event) => onNameChange(event.target.value)} />
       </label>
       <label className="field">
-        <span>手机号（选填）</span>
+        <span>手机号</span>
         <input
           value={phone}
           inputMode="numeric"
-          placeholder="可填手机号或后四位"
+          placeholder="11 位手机号，必填"
           onChange={(event) => onPhoneChange(event.target.value)}
         />
       </label>

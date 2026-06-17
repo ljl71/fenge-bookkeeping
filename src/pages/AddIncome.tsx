@@ -9,6 +9,7 @@ import { findOrCreateCustomer } from '../services/customerService';
 import { createTransaction } from '../services/transactionService';
 import { todayString } from '../utils/date';
 import { formatMoney } from '../utils/money';
+import { normalizePhone } from '../utils/phone';
 
 const emptyItem = (): TransactionItem => ({
   categoryId: '',
@@ -21,7 +22,6 @@ const emptyItem = (): TransactionItem => ({
 
 export function AddIncome() {
   const { session, data, refreshData, navigate, setToast } = useApp();
-  const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerNote, setCustomerNote] = useState('');
@@ -37,7 +37,6 @@ export function AddIncome() {
   const totalAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   function pickCustomer(customer: Customer) {
-    setCustomerId(customer._id ?? '');
     setCustomerName(customer.name);
     setCustomerPhone(customer.phone ?? '');
     setCustomerNote(customer.note ?? '');
@@ -50,14 +49,13 @@ export function AddIncome() {
     try {
       const validItems = items.filter((item) => item.categoryId && item.amount > 0);
       if (!customerName.trim()) throw new Error('请填写顾客姓名');
+      if (normalizePhone(customerPhone).length !== 11) throw new Error('请填写 11 位顾客手机号');
       if (!validItems.length) throw new Error('请至少添加一个消费项目');
       if (totalAmount <= 0) throw new Error('金额必须大于 0');
       const selectedPaymentId = paymentMethodId || defaultPayment?._id;
       const payment = data.paymentMethods.find((method) => method._id === selectedPaymentId);
       if (!payment) throw new Error('请选择支付方式');
-      const customer = customerId
-        ? data.customers.find((row) => row._id === customerId) ?? (await findOrCreateCustomer(session.storeId, { name: customerName, phone: customerPhone, note: customerNote }))
-        : await findOrCreateCustomer(session.storeId, { name: customerName, phone: customerPhone, note: customerNote });
+      const customer = await findOrCreateCustomer(session.storeId, { name: customerName, phone: customerPhone, note: customerNote });
       await createTransaction({
         storeId: session.storeId,
         type: 'income',
@@ -92,9 +90,10 @@ export function AddIncome() {
         note={customerNote}
         onNameChange={(value) => {
           setCustomerName(value);
-          setCustomerId('');
         }}
-        onPhoneChange={setCustomerPhone}
+        onPhoneChange={(value) => {
+          setCustomerPhone(value);
+        }}
         onNoteChange={setCustomerNote}
         onPick={pickCustomer}
       />

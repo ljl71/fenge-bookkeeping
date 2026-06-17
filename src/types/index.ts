@@ -131,10 +131,7 @@ export interface QueryFilters {
   startDate: string;
   endDate: string;
   keyword: string;
-  type: 'all' | TransactionType;
   categoryId: string;
-  itemId: string;
-  expenseCategoryId: string;
   paymentMethodId: string;
   noteKeyword: string;
   createdBy: 'all' | Role;

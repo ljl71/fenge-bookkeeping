@@ -1,6 +1,10 @@
 node_modules/
 .pnpm-store/
 dist/
+public/test-import/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 *.log
 .env
 .env.local

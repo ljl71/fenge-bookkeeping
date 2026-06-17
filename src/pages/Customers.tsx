@@ -1,82 +1,103 @@
 import { useMemo, useState } from 'react';
-import { Edit3, Plus, Save, Trash2 } from 'lucide-react';
+import { Edit3, Plus, Save, Search, X } from 'lucide-react';
 import { useApp } from '../AppContext';
 import type { Customer } from '../types';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
-import { filterCustomers, saveCustomer, softDeleteCustomer } from '../services/customerService';
+import { filterCustomers, saveCustomer } from '../services/customerService';
 import { customerStats } from '../utils/stats';
 import { formatMoney } from '../utils/money';
 import { maskPhone } from '../utils/phone';
 
 const blankCustomer = { name: '', phone: '', note: '' };
+type CustomerDraft = Partial<Customer> & { name: string; phone: string };
 
 export function Customers() {
   const { session, data, refreshData, navigate, setToast } = useApp();
+  const [draftKeyword, setDraftKeyword] = useState('');
   const [keyword, setKeyword] = useState('');
-  const [editing, setEditing] = useState<Partial<Customer> & { name: string }>(blankCustomer);
-  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [editing, setEditing] = useState<CustomerDraft | null>(null);
   const rows = useMemo(() => filterCustomers(data.customers, keyword), [data.customers, keyword]);
+
+  function searchCustomers(event: React.FormEvent) {
+    event.preventDefault();
+    setKeyword(draftKeyword);
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (!editing) return;
     try {
       await saveCustomer(session.storeId, editing);
       await refreshData();
-      setEditing(blankCustomer);
+      setEditing(null);
       setToast({ kind: 'success', message: '顾客保存成功' });
     } catch (error) {
       setToast({ kind: 'error', message: error instanceof Error ? error.message : '保存失败' });
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    try {
-      await softDeleteCustomer(deleteTarget);
-      await refreshData();
-      setDeleteTarget(null);
-      setToast({ kind: 'success', message: '顾客已删除' });
-    } catch (error) {
-      setToast({ kind: 'error', message: error instanceof Error ? error.message : '删除失败' });
-    }
-  }
-
   return (
     <div className="page">
-      <PageHeader title="顾客" subtitle="可按姓名、手机号和后四位搜索。" />
-      <section className="panel">
-        <label className="field">
-          <span>搜索顾客</span>
-          <input value={keyword} placeholder="输入姓名、手机号或后四位" onChange={(event) => setKeyword(event.target.value)} />
-        </label>
-      </section>
-      <form className="panel" onSubmit={submit}>
-        <div className="panel-title-row">
-          <h2>{editing._id ? '编辑顾客' : '新增顾客'}</h2>
+      <PageHeader
+        title="顾客"
+        action={
           <button type="button" className="button button--ghost" onClick={() => setEditing(blankCustomer)}>
             <Plus size={18} />
             新增
           </button>
-        </div>
+        }
+      />
+      <form className="panel" onSubmit={searchCustomers}>
         <label className="field">
-          <span>姓名</span>
-          <input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} />
+          <span>搜索顾客</span>
+          <div className="search-row">
+            <input
+              value={draftKeyword}
+              placeholder="输入姓名、手机号或后四位"
+              onChange={(event) => {
+                setDraftKeyword(event.target.value);
+                setKeyword(event.target.value);
+              }}
+            />
+            <button type="submit" className="button button--secondary">
+              <Search size={18} />
+              搜索
+            </button>
+          </div>
         </label>
-        <label className="field">
-          <span>手机号（选填）</span>
-          <input inputMode="numeric" value={editing.phone ?? ''} onChange={(event) => setEditing({ ...editing, phone: event.target.value })} />
-        </label>
-        <label className="field">
-          <span>备注（选填）</span>
-          <textarea value={editing.note ?? ''} maxLength={200} onChange={(event) => setEditing({ ...editing, note: event.target.value })} />
-        </label>
-        <button type="submit" className="button button--primary button--block">
-          <Save size={20} />
-          保存顾客
-        </button>
       </form>
+      {editing ? (
+        <form className="panel" onSubmit={submit}>
+          <div className="panel-title-row">
+            <h2>{editing._id ? '编辑顾客信息' : '新增顾客'}</h2>
+            <button type="button" className="icon-button" onClick={() => setEditing(null)} aria-label="关闭编辑" title="关闭">
+              <X size={18} />
+            </button>
+          </div>
+          <label className="field">
+            <span>姓名</span>
+            <input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>手机号</span>
+            <input
+              inputMode="numeric"
+              placeholder="11 位手机号"
+              value={editing.phone ?? ''}
+              onChange={(event) => setEditing({ ...editing, phone: event.target.value })}
+            />
+          </label>
+          <label className="field">
+            <span>备注（选填）</span>
+            <textarea value={editing.note ?? ''} maxLength={200} onChange={(event) => setEditing({ ...editing, note: event.target.value })} />
+          </label>
+          <button type="submit" className="button button--primary button--block">
+            <Save size={20} />
+            保存顾客
+          </button>
+        </form>
+      ) : null}
       <section className="stack">
         {rows.length ? (
           rows.map((customer) => {
@@ -91,17 +112,14 @@ export function Customers() {
                   </small>
                 </button>
                 <div className="icon-actions">
-                  <button type="button" className="icon-button" onClick={() => setEditing(customer)} aria-label="编辑顾客" title="编辑">
-                    <Edit3 size={18} />
-                  </button>
                   <button
                     type="button"
-                    className="icon-button icon-button--danger"
-                    onClick={() => setDeleteTarget(customer)}
-                    aria-label="删除顾客"
-                    title="删除"
+                    className="icon-button"
+                    onClick={() => setEditing({ ...customer, name: customer.name, phone: customer.phone ?? '' })}
+                    aria-label="编辑顾客"
+                    title="编辑"
                   >
-                    <Trash2 size={18} />
+                    <Edit3 size={18} />
                   </button>
                 </div>
               </article>
@@ -111,14 +129,6 @@ export function Customers() {
           <EmptyState title="没有找到相关顾客" text="换个关键词试试，或直接新增顾客。" />
         )}
       </section>
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        title="删除顾客"
-        message="删除后顾客列表不再显示，但历史流水仍会保留。确定删除吗？"
-        danger
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-      />
     </div>
   );
 }

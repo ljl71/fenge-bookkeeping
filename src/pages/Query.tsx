@@ -1,17 +1,17 @@
-import { useMemo, useState } from 'react';
-import { Download, RotateCcw, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Download, FileJson, FileSpreadsheet, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useApp } from '../AppContext';
-import type { DatePreset, QueryFilters, Transaction } from '../types';
+import type { Customer, DatePreset, QueryFilters, Transaction } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
-import { SummaryCard } from '../components/SummaryCard';
 import { TransactionCard } from '../components/TransactionCard';
 import { roleText } from '../constants/defaults';
 import { filterTransactions, softDeleteTransaction } from '../services/transactionService';
 import { getDateRange } from '../utils/date';
-import { downloadText, transactionsToCsv } from '../utils/exportCsv';
+import { makeFengeWorkbook } from '../utils/excel';
+import { downloadBlob, downloadText, transactionsToCsv } from '../utils/exportCsv';
 import { formatMoney } from '../utils/money';
 import { summarize } from '../utils/stats';
 
@@ -22,10 +22,7 @@ function defaultFilters(): QueryFilters {
     startDate: range.startDate,
     endDate: range.endDate,
     keyword: '',
-    type: 'all',
     categoryId: '',
-    itemId: '',
-    expenseCategoryId: '',
     paymentMethodId: '',
     noteKeyword: '',
     createdBy: 'all'
@@ -34,14 +31,69 @@ function defaultFilters(): QueryFilters {
 
 export function Query() {
   const { data, navigate, refreshData, setToast } = useApp();
-  const [filters, setFilters] = useState<QueryFilters>(defaultFilters);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [draftFilters, setDraftFilters] = useState<QueryFilters>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState<QueryFilters>(defaultFilters);
+  const [exportOpen, setExportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
-  const rows = useMemo(() => filterTransactions(data.transactions, filters), [data.transactions, filters]);
+  const rows = useMemo(
+    () => filterTransactions(data.transactions, appliedFilters, data.customers),
+    [data.transactions, data.customers, appliedFilters]
+  );
+  const involvedCustomers = useMemo(() => customersForRows(rows, data.customers), [rows, data.customers]);
   const stats = summarize(rows);
 
+  function updateDraftFilters(next: QueryFilters) {
+    setDraftFilters(next);
+    setExportOpen(false);
+  }
+
   function setPreset(preset: DatePreset) {
-    const range = getDateRange(preset, filters.startDate, filters.endDate);
-    setFilters({ ...filters, preset, ...range });
+    const range = getDateRange(preset, draftFilters.startDate, draftFilters.endDate);
+    updateDraftFilters({ ...draftFilters, preset, ...range });
+  }
+
+  function submitQuery(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    applyCurrentFilters(event?.currentTarget);
+  }
+
+  function applyCurrentFilters(formOverride?: HTMLFormElement) {
+    const form = formOverride ?? formRef.current;
+    const next = form ? filtersFromForm(form, draftFilters) : draftFilters;
+    setDraftFilters(next);
+    setAppliedFilters(next);
+    setExportOpen(false);
+  }
+
+  function resetFilters() {
+    const next = defaultFilters();
+    setDraftFilters(next);
+    setAppliedFilters(next);
+    setExportOpen(false);
+  }
+
+  function exportJson() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      filters: appliedFilters,
+      transactions: rows
+    };
+    downloadText(`fenge-query-${appliedFilters.startDate}-${appliedFilters.endDate}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+    setExportOpen(false);
+    setToast({ kind: 'success', message: '已导出 JSON' });
+  }
+
+  function exportExcel() {
+    downloadBlob(`fenge-query-${appliedFilters.startDate}-${appliedFilters.endDate}.xlsx`, makeFengeWorkbook(rows, involvedCustomers));
+    setExportOpen(false);
+    setToast({ kind: 'success', message: '已导出 Excel' });
+  }
+
+  function exportCsv() {
+    downloadText(`fenge-query-${appliedFilters.startDate}-${appliedFilters.endDate}.csv`, transactionsToCsv(rows), 'text/csv;charset=utf-8');
+    setExportOpen(false);
+    setToast({ kind: 'success', message: '已导出 CSV' });
   }
 
   async function confirmDelete() {
@@ -58,71 +110,30 @@ export function Query() {
 
   return (
     <div className="page">
-      <PageHeader title="查询" subtitle="组合筛选流水，也可以导出当前结果。" />
-      <section className="panel">
+      <PageHeader title="查询" subtitle="按顾客姓名或手机号查收入流水。" />
+      <form ref={formRef} className="panel query-filter-panel" onSubmit={submitQuery}>
         <DateRangePicker
-          preset={filters.preset}
-          startDate={filters.startDate}
-          endDate={filters.endDate}
+          preset={draftFilters.preset}
+          startDate={draftFilters.startDate}
+          endDate={draftFilters.endDate}
           onPresetChange={setPreset}
-          onStartChange={(startDate) => setFilters({ ...filters, startDate, preset: 'custom' })}
-          onEndChange={(endDate) => setFilters({ ...filters, endDate, preset: 'custom' })}
+          onStartChange={(startDate) => updateDraftFilters({ ...draftFilters, startDate, preset: 'custom' })}
+          onEndChange={(endDate) => updateDraftFilters({ ...draftFilters, endDate, preset: 'custom' })}
         />
-        <label className="field">
-          <span>姓名 / 手机号 / 后四位</span>
-          <input value={filters.keyword} onChange={(event) => setFilters({ ...filters, keyword: event.target.value })} />
-        </label>
-        <div className="two-cols">
-          <label className="field">
-            <span>类型</span>
-            <select value={filters.type} onChange={(event) => setFilters({ ...filters, type: event.target.value as QueryFilters['type'] })}>
-              <option value="all">全部</option>
-              <option value="income">收入</option>
-              <option value="expense">支出</option>
-            </select>
+        <div className="query-filter-grid">
+          <label className="field query-filter-grid__wide">
+            <span>顾客姓名 / 手机号 / 后四位</span>
+            <input
+              name="keyword"
+              value={draftFilters.keyword}
+              onChange={(event) => updateDraftFilters({ ...draftFilters, keyword: event.currentTarget.value })}
+            />
           </label>
-          <label className="field">
-            <span>记账人</span>
-            <select value={filters.createdBy} onChange={(event) => setFilters({ ...filters, createdBy: event.target.value as QueryFilters['createdBy'] })}>
-              <option value="all">全部</option>
-              <option value="mom">{roleText.mom}</option>
-              <option value="dad">{roleText.dad}</option>
-              <option value="unknown">{roleText.unknown}</option>
-            </select>
-          </label>
-        </div>
-        <div className="two-cols">
           <label className="field">
             <span>一级项目</span>
-            <select value={filters.categoryId} onChange={(event) => setFilters({ ...filters, categoryId: event.target.value, itemId: '' })}>
+            <select name="categoryId" value={draftFilters.categoryId} onChange={(event) => updateDraftFilters({ ...draftFilters, categoryId: event.target.value })}>
               <option value="">全部</option>
-              {data.serviceCategories.map((category) => (
-                <option key={category._id} value={category._id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>子项目</span>
-            <select value={filters.itemId} onChange={(event) => setFilters({ ...filters, itemId: event.target.value })}>
-              <option value="">全部</option>
-              {data.serviceItems
-                .filter((item) => !filters.categoryId || item.categoryId === filters.categoryId)
-                .map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.categoryName}/{item.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-        </div>
-        <div className="two-cols">
-          <label className="field">
-            <span>支出类别</span>
-            <select value={filters.expenseCategoryId} onChange={(event) => setFilters({ ...filters, expenseCategoryId: event.target.value })}>
-              <option value="">全部</option>
-              {data.expenseCategories.map((category) => (
+              {data.serviceCategories.filter((category) => !category.deletedAt).map((category) => (
                 <option key={category._id} value={category._id}>
                   {category.name}
                 </option>
@@ -131,46 +142,91 @@ export function Query() {
           </label>
           <label className="field">
             <span>支付方式</span>
-            <select value={filters.paymentMethodId} onChange={(event) => setFilters({ ...filters, paymentMethodId: event.target.value })}>
+            <select
+              name="paymentMethodId"
+              value={draftFilters.paymentMethodId}
+              onChange={(event) => updateDraftFilters({ ...draftFilters, paymentMethodId: event.target.value })}
+            >
               <option value="">全部</option>
-              {data.paymentMethods.map((method) => (
+              {data.paymentMethods.filter((method) => !method.deletedAt).map((method) => (
                 <option key={method._id} value={method._id}>
                   {method.name}
                 </option>
               ))}
             </select>
           </label>
+          <label className="field">
+            <span>记账人</span>
+            <select
+              name="createdBy"
+              value={draftFilters.createdBy}
+              onChange={(event) => updateDraftFilters({ ...draftFilters, createdBy: event.target.value as QueryFilters['createdBy'] })}
+            >
+              <option value="all">全部</option>
+              <option value="mom">{roleText.mom}</option>
+              <option value="dad">{roleText.dad}</option>
+              <option value="unknown">{roleText.unknown}</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>备注</span>
+            <input
+              name="noteKeyword"
+              value={draftFilters.noteKeyword}
+              onChange={(event) => updateDraftFilters({ ...draftFilters, noteKeyword: event.currentTarget.value })}
+            />
+          </label>
         </div>
-        <label className="field">
-          <span>备注关键词</span>
-          <input value={filters.noteKeyword} onChange={(event) => setFilters({ ...filters, noteKeyword: event.target.value })} />
-        </label>
-        <div className="button-row">
-          <button type="button" className="button button--ghost" onClick={() => setFilters(defaultFilters())}>
+        <div className="button-row query-actions">
+          <button type="button" className="button button--ghost" onClick={resetFilters}>
             <RotateCcw size={18} />
             重置筛选
           </button>
           <button
             type="button"
-            className="button button--primary"
-            onClick={() => downloadText(`fenge-query-${filters.startDate}-${filters.endDate}.csv`, transactionsToCsv(rows), 'text/csv;charset=utf-8')}
+            className="button button--secondary"
+            onClick={() => setExportOpen((open) => !open)}
           >
             <Download size={18} />
-            导出 CSV
+            导出
+          </button>
+          <button type="submit" className="button button--primary">
+            <Search size={18} />
+            查询
           </button>
         </div>
-      </section>
+        {exportOpen ? (
+          <div className="export-menu">
+            <button type="button" onClick={exportCsv}>
+              <Download size={18} />
+              导出 CSV
+            </button>
+            <button type="button" onClick={exportExcel}>
+              <FileSpreadsheet size={18} />
+              导出 Excel
+            </button>
+            <button type="button" onClick={exportJson}>
+              <FileJson size={18} />
+              导出 JSON
+            </button>
+          </div>
+        ) : null}
+      </form>
       <section>
         <h2 className="section-title">查询统计</h2>
-        <div className="summary-grid">
-          <SummaryCard label="记录总数" value={`${stats.total} 笔`} />
-          <SummaryCard label="总收入" value={formatMoney(stats.income)} tone="income" />
-          <SummaryCard label="总支出" value={formatMoney(stats.expense)} tone="expense" />
-          <SummaryCard label="净收入" value={formatMoney(stats.net)} tone={stats.net >= 0 ? 'income' : 'expense'} />
-          <SummaryCard label="收入笔数" value={`${stats.incomeCount} 笔`} />
-          <SummaryCard label="支出笔数" value={`${stats.expenseCount} 笔`} />
-          <SummaryCard label="涉及顾客" value={`${stats.customerCount} 位`} />
-          <SummaryCard label="平均客单价" value={formatMoney(stats.averageTicket)} />
+        <div className="query-stat-strip">
+          <span>
+            收入笔数<strong>{stats.incomeCount} 笔</strong>
+          </span>
+          <span>
+            总收入<strong>{formatMoney(stats.income)}</strong>
+          </span>
+          <span>
+            顾客<strong>{stats.customerCount} 位</strong>
+          </span>
+          <span>
+            客单价<strong>{formatMoney(stats.averageTicket)}</strong>
+          </span>
         </div>
       </section>
       <section>
@@ -200,4 +256,32 @@ export function Query() {
       />
     </div>
   );
+}
+
+function customersForRows(rows: Transaction[], customers: Customer[]) {
+  return customers.filter((customer) => {
+    if (customer.deletedAt) return false;
+    return rows.some((row) => {
+      if (customer._id && row.customerId === customer._id) return true;
+      if (customer.phone && row.customerPhone && customer.phone === row.customerPhone) return true;
+      return Boolean(customer.name && row.customerName && customer.name === row.customerName);
+    });
+  });
+}
+
+function filtersFromForm(form: HTMLFormElement, fallback: QueryFilters): QueryFilters {
+  const values = new FormData(form);
+  return {
+    ...fallback,
+    keyword: String(values.get('keyword') ?? fallback.keyword),
+    categoryId: String(values.get('categoryId') ?? fallback.categoryId),
+    paymentMethodId: String(values.get('paymentMethodId') ?? fallback.paymentMethodId),
+    noteKeyword: String(values.get('noteKeyword') ?? fallback.noteKeyword),
+    createdBy: parseCreatedBy(values.get('createdBy'), fallback.createdBy)
+  };
+}
+
+function parseCreatedBy(value: FormDataEntryValue | null, fallback: QueryFilters['createdBy']): QueryFilters['createdBy'] {
+  if (value === 'mom' || value === 'dad' || value === 'unknown' || value === 'all') return value;
+  return fallback;
 }
