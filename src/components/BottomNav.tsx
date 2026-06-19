@@ -1,5 +1,5 @@
 import { BookOpenText, Home, Search, Settings, UsersRound } from 'lucide-react';
-import { mainRoutes } from '../routes';
+import { getMainRoutes } from '../routes';
 import { useApp } from '../AppContext';
 
 const iconMap = {
@@ -11,14 +11,15 @@ const iconMap = {
 } as const;
 
 export function BottomNav() {
-  const { routeState, navigate } = useApp();
+  const { session, routeState, navigate } = useApp();
+  const mainRoutes = getMainRoutes(session);
   return (
-    <nav className="bottom-nav" aria-label="底部导航">
+    <nav className={`bottom-nav bottom-nav--${mainRoutes.length}`} aria-label="底部导航">
       {mainRoutes.map((item) => {
         const Icon = iconMap[item.route as keyof typeof iconMap];
         const active =
           routeState.route === item.route ||
-          (item.route === 'settings' && ['stats', 'projects', 'backup'].includes(routeState.route));
+          (item.route === 'settings' && ['stats', 'projects', 'backup', 'employeeManagement'].includes(routeState.route));
         return (
           <button
             key={item.route}

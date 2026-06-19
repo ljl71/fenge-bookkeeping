@@ -7,9 +7,10 @@ import { SummaryCard } from '../components/SummaryCard';
 import { customerStats } from '../utils/stats';
 import { formatMoney } from '../utils/money';
 import { maskPhone } from '../utils/phone';
+import { canEditTransaction } from '../utils/permissions';
 
 export function CustomerDetail() {
-  const { data, routeState, navigate } = useApp();
+  const { session, data, routeState, navigate } = useApp();
   const customer = data.customers.find((row) => row._id === routeState.params?.id);
   if (!customer) {
     return (
@@ -56,7 +57,11 @@ export function CustomerDetail() {
         {stats.rows.length ? (
           <div className="stack">
             {stats.rows.map((transaction) => (
-              <TransactionCard key={transaction._id} transaction={transaction} onEdit={() => navigate('editTransaction', { id: transaction._id ?? '' })} />
+              <TransactionCard
+                key={transaction._id}
+                transaction={transaction}
+                onEdit={canEditTransaction(session, transaction) ? () => navigate('editTransaction', { id: transaction._id ?? '' }) : undefined}
+              />
             ))}
           </div>
         ) : (

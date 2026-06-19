@@ -1,3 +1,5 @@
+import type { AppSession } from './types';
+
 export type AppRoute =
   | 'dashboard'
   | 'bookkeeping'
@@ -8,6 +10,7 @@ export type AppRoute =
   | 'settings'
   | 'projects'
   | 'backup'
+  | 'employeeManagement'
   | 'editTransaction';
 
 export interface RouteState {
@@ -15,13 +18,25 @@ export interface RouteState {
   params?: Record<string, string>;
 }
 
-export const mainRoutes: Array<{ route: AppRoute; label: string }> = [
+export const ownerMainRoutes: Array<{ route: AppRoute; label: string }> = [
   { route: 'dashboard', label: '首页' },
   { route: 'bookkeeping', label: '记账' },
   { route: 'customers', label: '顾客' },
   { route: 'query', label: '查询' },
   { route: 'settings', label: '设置' }
 ];
+
+export const employeeMainRoutes: Array<{ route: AppRoute; label: string }> = [
+  { route: 'dashboard', label: '首页' },
+  { route: 'bookkeeping', label: '记账' },
+  { route: 'customers', label: '顾客' },
+  { route: 'query', label: '查询' },
+  { route: 'settings', label: '设置' }
+];
+
+export function getMainRoutes(session: AppSession) {
+  return session.role === 'employee' ? employeeMainRoutes : ownerMainRoutes;
+}
 
 export function encodeRoute(route: AppRoute, params?: Record<string, string>) {
   const query = new URLSearchParams(params ?? {}).toString();
@@ -42,6 +57,7 @@ export function parseRoute(): RouteState {
     'settings',
     'projects',
     'backup',
+    'employeeManagement',
     'editTransaction'
   ];
   return {

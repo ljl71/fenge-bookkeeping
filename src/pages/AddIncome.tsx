@@ -49,29 +49,31 @@ export function AddIncome() {
     setSaving(true);
     try {
       if (!customerName.trim()) throw new Error('请填写顾客姓名');
-      if (normalizePhone(customerPhone).length !== 11) throw new Error('请填写 11 位顾客手机号');
+      const cleanedPhone = normalizePhone(customerPhone);
+      if (cleanedPhone && cleanedPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
       if (items.some((item) => !item.categoryId && item.amount > 0)) throw new Error('有项目已填写金额但未选择一级项目');
       if (!validItems.length) throw new Error('请至少添加一个消费项目');
       if (totalAmount <= 0) throw new Error('金额必须大于 0');
       const selectedPaymentId = paymentMethodId || defaultPayment?._id;
       const payment = data.paymentMethods.find((method) => method._id === selectedPaymentId);
       if (!payment) throw new Error('请选择支付方式');
-      const customer = await findOrCreateCustomer(session.storeId, { name: customerName, phone: customerPhone, note: customerNote });
+      const customer = cleanedPhone
+        ? await findOrCreateCustomer(session.storeId, { name: customerName, phone: cleanedPhone, note: customerNote })
+        : null;
       await createTransaction({
         storeId: session.storeId,
         type: 'income',
-        customerId: customer._id,
-        customerName: customer.name,
-        customerPhone: customer.phone,
+        customerId: customer?._id,
+        customerName: customer?.name ?? customerName.trim(),
+        customerPhone: customer?.phone ?? cleanedPhone,
         items: validItems,
         totalAmount,
         paymentMethodId: payment._id,
         paymentMethodName: payment.name,
         date,
         note,
-        createdBy: session.role,
         deletedAt: null
-      });
+      }, session);
       await refreshData();
       setToast({ kind: 'success', message: '收入保存成功' });
       navigate('dashboard');

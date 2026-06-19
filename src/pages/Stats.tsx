@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useApp } from '../AppContext';
-import type { DatePreset, Transaction } from '../types';
+import type { DatePreset, Role, StoreUser, Transaction } from '../types';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
+import { roleText } from '../constants/defaults';
 import { getDateRange, sortByDateDesc } from '../utils/date';
 import { isPurchaseExpense, purchaseItemName } from '../utils/expense';
 import { itemsText } from '../utils/exportCsv';
@@ -33,10 +34,12 @@ export function Stats() {
   const [preset, setPreset] = useState<DatePreset>('month');
   const [startDate, setStartDate] = useState(initial.startDate);
   const [endDate, setEndDate] = useState(initial.endDate);
+  const [bookkeeperFilter, setBookkeeperFilter] = useState('all');
+  const bookkeeperOptions = useMemo(() => makeBookkeeperOptions(data.storeUsers), [data.storeUsers]);
 
   const rangeRows = useMemo(
-    () => inDateRange(data.transactions, startDate, endDate),
-    [data.transactions, startDate, endDate]
+    () => inDateRange(data.transactions, startDate, endDate).filter((row) => matchesBookkeeper(row, bookkeeperFilter, data.storeUsers)),
+    [data.transactions, startDate, endDate, bookkeeperFilter, data.storeUsers]
   );
   const incomeRows = useMemo(() => rangeRows.filter((row) => row.type === 'income'), [rangeRows]);
   const purchaseRows = useMemo(() => rangeRows.filter(isPurchaseExpense), [rangeRows]);
@@ -125,6 +128,16 @@ export function Stats() {
             setEndDate(value);
           }}
         />
+        <label className="field">
+          <span>记账人</span>
+          <select value={bookkeeperFilter} onChange={(event) => setBookkeeperFilter(event.target.value)}>
+            {bookkeeperOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
       <div className="query-stat-strip stats-stat-strip">
         <span>
@@ -243,4 +256,35 @@ export function Stats() {
       </section>
     </div>
   );
+}
+
+function makeBookkeeperOptions(users: StoreUser[]) {
+  const liveUsers = users
+    .filter((user) => !user.deletedAt)
+    .sort((a, b) => Number(b.role === 'owner') - Number(a.role === 'owner') || a.displayName.localeCompare(b.displayName, 'zh-CN'));
+  const coveredLegacyRoles = new Set<Role>();
+  const options = [{ value: 'all', label: '全部' }];
+  liveUsers.forEach((user) => {
+    if (user.legacyRole) coveredLegacyRoles.add(user.legacyRole);
+    options.push({
+      value: `user:${user._id ?? user.username}`,
+      label: `${user.displayName}${user.role === 'employee' ? '（员工）' : ''}`
+    });
+  });
+  (['mom', 'dad', 'unknown'] as Role[]).forEach((role) => {
+    if (!coveredLegacyRoles.has(role)) options.push({ value: `legacy:${role}`, label: roleText[role] });
+  });
+  return options;
+}
+
+function matchesBookkeeper(row: Transaction, filter: string, users: StoreUser[]) {
+  if (filter === 'all') return true;
+  if (filter.startsWith('legacy:')) return row.createdBy === filter.slice('legacy:'.length);
+  if (filter.startsWith('user:')) {
+    const userId = filter.slice('user:'.length);
+    if (row.createdByUserId === userId) return true;
+    const user = users.find((item) => (item._id ?? item.username) === userId);
+    return Boolean(!row.createdByUserId && user?.legacyRole && row.createdBy === user.legacyRole);
+  }
+  return row.createdByUserId === filter;
 }

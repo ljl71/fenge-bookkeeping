@@ -28,6 +28,9 @@ export function transactionsToCsv(transactions: Transaction[]): string {
     'paymentMethodName',
     'note',
     'createdBy',
+    'createdByUserId',
+    'createdByName',
+    'createdByRole',
     'createdAt',
     'updatedAt'
   ];
@@ -43,6 +46,9 @@ export function transactionsToCsv(transactions: Transaction[]): string {
     row.paymentMethodName,
     row.note,
     row.createdBy,
+    row.createdByUserId,
+    row.createdByName,
+    row.createdByRole,
     row.createdAt,
     row.updatedAt
   ]);

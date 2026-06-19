@@ -1,4 +1,4 @@
-import type { ExpenseCategory, PaymentMethod, ServiceCategory, ServiceItem, Store } from '../types';
+import type { ExpenseCategory, PaymentMethod, ServiceCategory, ServiceItem, Store, StoreUser } from '../types';
 import { PURCHASE_EXPENSE_CATEGORY_ID, PURCHASE_EXPENSE_CATEGORY_NAME } from '../utils/expense';
 
 export const DEMO_PIN = '123456';
@@ -11,8 +11,14 @@ export const roleText = {
   unknown: '未知'
 } as const;
 
+export const accountRoleText = {
+  owner: '店主',
+  employee: '员工'
+} as const;
+
 export const collectionNames = [
   'stores',
+  'storeUsers',
   'customers',
   'serviceCategories',
   'serviceItems',
@@ -30,6 +36,49 @@ export function defaultStore(now: string): Store {
     createdAt: now,
     updatedAt: now
   };
+}
+
+export function defaultStoreUsers(storeId: string, now: string, pinHashes: Record<string, string>): StoreUser[] {
+  return [
+    {
+      _id: 'store-user-mom',
+      storeId,
+      username: 'mom',
+      displayName: '妈妈',
+      role: 'owner',
+      legacyRole: 'mom',
+      pinHash: pinHashes.mom,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null
+    },
+    {
+      _id: 'store-user-dad',
+      storeId,
+      username: 'dad',
+      displayName: '爸爸',
+      role: 'owner',
+      legacyRole: 'dad',
+      pinHash: pinHashes.dad,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null
+    },
+    {
+      _id: 'store-user-xiaowang',
+      storeId,
+      username: 'xiaowang',
+      displayName: '小王',
+      role: 'employee',
+      pinHash: pinHashes.xiaowang,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null
+    }
+  ];
 }
 
 export const defaultServiceCategoryNames = ['睫毛', '美甲', '洗脸', '护肤', '产品', '办卡/充值', '其他'];

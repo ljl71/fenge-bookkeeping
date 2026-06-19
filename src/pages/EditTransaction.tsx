@@ -12,6 +12,8 @@ import { findOrCreateCustomer } from '../services/customerService';
 import { updateTransaction } from '../services/transactionService';
 import { PURCHASE_EXPENSE_CATEGORY_ID, PURCHASE_EXPENSE_CATEGORY_NAME } from '../utils/expense';
 import { formatMoney, sumMoney } from '../utils/money';
+import { normalizePhone } from '../utils/phone';
+import { canEditTransaction } from '../utils/permissions';
 
 const emptyItem = (): TransactionItem => ({ categoryId: '', categoryName: '', amount: 0, note: '' });
 const emptyPurchaseItem = (): TransactionItem => ({
@@ -42,6 +44,15 @@ export function EditTransaction() {
     );
   }
 
+  if (original && !canEditTransaction(session, original)) {
+    return (
+      <div className="page">
+        <PageHeader title="编辑流水" action={<BackButton />} />
+        <EmptyState title="当前账号无权限编辑这条流水" text="请返回查询页查看自己的流水。" />
+      </div>
+    );
+  }
+
   function pickCustomer(customer: Customer) {
     setDraft((current) =>
       current
@@ -66,17 +77,21 @@ export function EditTransaction() {
 
       if (next.type === 'income') {
         const validItems = (next.items ?? []).filter((item) => item.categoryId && item.amount > 0);
+        const cleanedPhone = normalizePhone(next.customerPhone);
         if (!next.customerName?.trim()) throw new Error('请填写顾客姓名');
+        if (cleanedPhone && cleanedPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
         if (!validItems.length) throw new Error('请至少保留一个消费项目');
-        const customer = await findOrCreateCustomer(session.storeId, {
-          name: next.customerName,
-          phone: next.customerPhone
-        });
+        const customer = cleanedPhone
+          ? await findOrCreateCustomer(session.storeId, {
+              name: next.customerName,
+              phone: cleanedPhone
+            })
+          : null;
         next = {
           ...next,
-          customerId: customer._id,
-          customerName: customer.name,
-          customerPhone: customer.phone,
+          customerId: customer?._id,
+          customerName: customer?.name ?? next.customerName.trim(),
+          customerPhone: customer?.phone ?? cleanedPhone,
           items: validItems,
           totalAmount: sumMoney(validItems.map((item) => item.amount))
         };
@@ -92,7 +107,7 @@ export function EditTransaction() {
         };
       }
 
-      await updateTransaction(next);
+      await updateTransaction(next, session);
       await refreshData();
       setToast({ kind: 'success', message: '流水已保存' });
       navigate('query');

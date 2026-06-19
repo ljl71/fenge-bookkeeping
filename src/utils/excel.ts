@@ -61,11 +61,12 @@ export function makeFengeWorkbook(transactions: Transaction[], customers: Custom
         item.amount,
         transaction.paymentMethodName,
         transaction.note ?? '',
-        transaction.createdBy ?? ''
+        transaction.createdByName ?? transaction.createdBy ?? ''
       ]);
     });
 
-  const customerRows = customers
+  const exportCustomers = customers.length ? customers : inferCustomersFromTransactions(transactions);
+  const customerRows = exportCustomers
     .filter((customer) => !customer.deletedAt)
     .map((customer) => [customer.name, customer.phone ?? '', customer.note ?? '']);
 
@@ -389,6 +390,26 @@ function pickCell(row: Record<string, string>, aliases: string[]): string {
 function parseAmount(value: string): number {
   const amount = Number(value.replace(/[,\s¥￥]/g, ''));
   return Number.isFinite(amount) ? roundMoney(amount) : 0;
+}
+
+function inferCustomersFromTransactions(transactions: Transaction[]): Customer[] {
+  const result = new Map<string, Customer>();
+  transactions.forEach((transaction) => {
+    if (transaction.deletedAt || transaction.type !== 'income' || !transaction.customerName) return;
+    const key = transaction.customerPhone || transaction.customerName;
+    if (result.has(key)) return;
+    result.set(key, {
+      _id: transaction.customerId,
+      storeId: transaction.storeId,
+      name: transaction.customerName,
+      phone: transaction.customerPhone,
+      note: '',
+      createdAt: transaction.createdAt,
+      updatedAt: transaction.updatedAt,
+      deletedAt: null
+    });
+  });
+  return [...result.values()];
 }
 
 function normalizeDate(value: string): string {

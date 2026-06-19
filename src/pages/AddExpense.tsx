@@ -53,9 +53,8 @@ export function AddExpense() {
         paymentMethodName: payment.name,
         date,
         note,
-        createdBy: session.role,
         deletedAt: null
-      });
+      }, session);
       await refreshData();
       setToast({ kind: 'success', message: '进货支出保存成功' });
       navigate('dashboard');

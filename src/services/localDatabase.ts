@@ -7,9 +7,11 @@ import type {
   ServiceCategory,
   ServiceItem,
   Store,
+  StoreUser,
   Transaction
 } from '../types';
 import {
+  defaultStoreUsers,
   defaultExpenseCategories,
   defaultPaymentMethods,
   defaultServiceCategories,
@@ -27,6 +29,7 @@ const KEY = 'fenge-bookkeeping-demo-db';
 
 const emptyData = (): DemoDb => ({
   stores: [],
+  storeUsers: [],
   customers: [],
   serviceCategories: [],
   serviceItems: [],
@@ -39,8 +42,14 @@ function seed(): DemoDb {
   const now = nowIso();
   const store = defaultStore(now);
   const serviceCategories = defaultServiceCategories(DEMO_STORE_ID, now);
+  const storeUsers = defaultStoreUsers(DEMO_STORE_ID, now, {
+    mom: '35bde580ab2dccfdeb4dae54d822a846e6e53cbcd53e2ee7831dbdb2d8defeb2',
+    dad: '075554a681da3f1cd79d119cb34340580fc60b62baea153b1db306036fb12f07',
+    xiaowang: '0fe1faf29647c6c2c04311a50f0b155e46c7dc08ae12436ee0ce2403967ad1d7'
+  });
   return {
     stores: [store],
+    storeUsers,
     customers: [
       {
         _id: 'customer-demo-1',
@@ -122,6 +131,7 @@ export const localDatabase = {
     const db = read();
     return {
       stores: db.stores.filter((store) => store.storeId === storeId),
+      storeUsers: db.storeUsers.filter((row: StoreUser) => row.storeId === storeId),
       customers: db.customers.filter((row: Customer) => row.storeId === storeId),
       serviceCategories: db.serviceCategories.filter((row: ServiceCategory) => row.storeId === storeId),
       serviceItems: db.serviceItems.filter((row: ServiceItem) => row.storeId === storeId),

@@ -93,9 +93,9 @@ export function Backup() {
           paymentMethodName: payment.name,
           date: row.date,
           note: row.note ?? '',
-          createdBy: row.createdBy ?? session.role,
+          createdBy: row.createdBy ?? session.legacyRole ?? 'unknown',
           deletedAt: null
-        });
+        }, session);
         incomeCount += 1;
       }
 

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
-import { Download, FileJson, FileSpreadsheet, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Download, FileJson, FileSpreadsheet, RotateCcw, Search } from 'lucide-react';
 import { useApp } from '../AppContext';
-import type { Customer, DatePreset, QueryFilters, Transaction } from '../types';
+import type { Customer, DatePreset, QueryFilters, Role, StoreUser, Transaction } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { EmptyState } from '../components/EmptyState';
@@ -13,32 +13,43 @@ import { getDateRange } from '../utils/date';
 import { makeFengeWorkbook } from '../utils/excel';
 import { downloadBlob, downloadText, transactionsToCsv } from '../utils/exportCsv';
 import { formatMoney } from '../utils/money';
+import { canDeleteTransaction, canEditTransaction, isOwner } from '../utils/permissions';
 import { summarize } from '../utils/stats';
 
-function defaultFilters(): QueryFilters {
+interface BookkeeperOption {
+  value: string;
+  label: string;
+  createdBy: QueryFilters['createdBy'];
+}
+
+function defaultFilters(employee = false): QueryFilters {
   const range = getDateRange('month');
   return {
-    type: 'all',
+    type: employee ? 'income' : 'all',
     preset: 'month',
     startDate: range.startDate,
     endDate: range.endDate,
     keyword: '',
     categoryId: '',
     paymentMethodId: '',
-    createdBy: 'all'
+    createdBy: 'all',
+    createdByUserId: 'all'
   };
 }
 
 export function Query() {
-  const { data, navigate, refreshData, setToast } = useApp();
+  const { session, data, navigate, refreshData, setToast } = useApp();
+  const owner = isOwner(session);
+  const employee = session.role === 'employee';
   const formRef = useRef<HTMLFormElement>(null);
-  const [draftFilters, setDraftFilters] = useState<QueryFilters>(defaultFilters);
-  const [appliedFilters, setAppliedFilters] = useState<QueryFilters>(defaultFilters);
+  const [draftFilters, setDraftFilters] = useState<QueryFilters>(() => defaultFilters(session.role === 'employee'));
+  const [appliedFilters, setAppliedFilters] = useState<QueryFilters>(() => defaultFilters(session.role === 'employee'));
   const [exportOpen, setExportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
+  const bookkeeperOptions = useMemo(() => makeBookkeeperOptions(data.storeUsers), [data.storeUsers]);
   const rows = useMemo(
-    () => filterTransactions(data.transactions, appliedFilters, data.customers),
-    [data.transactions, data.customers, appliedFilters]
+    () => filterTransactions(data.transactions, appliedFilters, data.customers, session),
+    [data.transactions, data.customers, appliedFilters, session]
   );
   const involvedCustomers = useMemo(() => customersForRows(rows, data.customers), [rows, data.customers]);
   const stats = summarize(rows);
@@ -60,14 +71,14 @@ export function Query() {
 
   function applyCurrentFilters(formOverride?: HTMLFormElement) {
     const form = formOverride ?? formRef.current;
-    const next = form ? filtersFromForm(form, draftFilters) : draftFilters;
+    const next = form ? filtersFromForm(form, draftFilters, bookkeeperOptions) : draftFilters;
     setDraftFilters(next);
     setAppliedFilters(next);
     setExportOpen(false);
   }
 
   function resetFilters() {
-    const next = defaultFilters();
+    const next = defaultFilters(session.role === 'employee');
     setDraftFilters(next);
     setAppliedFilters(next);
     setExportOpen(false);
@@ -103,7 +114,7 @@ export function Query() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      await softDeleteTransaction(deleteTarget);
+      await softDeleteTransaction(deleteTarget, session);
       await refreshData();
       setDeleteTarget(null);
       setToast({ kind: 'success', message: '流水已删除' });
@@ -114,8 +125,8 @@ export function Query() {
 
   return (
     <div className="page">
-      <PageHeader title="查询" subtitle="按日期、类型、顾客、货品或项目查询流水。" />
-      <form ref={formRef} className="panel query-filter-panel" onSubmit={submitQuery}>
+      <PageHeader title="查询" subtitle={owner ? '按日期、类型、顾客、货品或项目查询流水。' : '只显示我自己记录的收入流水。'} />
+      <form ref={formRef} className={`panel query-filter-panel${employee ? ' query-filter-panel--employee' : ''}`} onSubmit={submitQuery}>
         <DateRangePicker
           preset={draftFilters.preset}
           startDate={draftFilters.startDate}
@@ -125,24 +136,26 @@ export function Query() {
           onEndChange={(endDate) => updateDraftFilters({ ...draftFilters, endDate, preset: 'custom' })}
         />
         <div className="query-filter-compact">
-          <div className="query-filter-row query-filter-row--main">
+          <div className={`query-filter-row ${owner ? 'query-filter-row--main' : 'query-filter-row--employee-main'}`}>
+            {owner ? (
+              <label className="field">
+                <span>流水类型</span>
+                <select
+                  name="type"
+                  value={draftFilters.type}
+                  onChange={(event) => {
+                    const type = event.target.value as QueryFilters['type'];
+                    updateDraftFilters({ ...draftFilters, type, categoryId: type === 'expense' ? '' : draftFilters.categoryId });
+                  }}
+                >
+                  <option value="all">全部</option>
+                  <option value="income">收入</option>
+                  <option value="expense">支出</option>
+                </select>
+              </label>
+            ) : null}
             <label className="field">
-              <span>流水类型</span>
-              <select
-                name="type"
-                value={draftFilters.type}
-                onChange={(event) => {
-                  const type = event.target.value as QueryFilters['type'];
-                  updateDraftFilters({ ...draftFilters, type, categoryId: type === 'expense' ? '' : draftFilters.categoryId });
-                }}
-              >
-                <option value="all">全部</option>
-                <option value="income">收入</option>
-                <option value="expense">支出</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>顾客姓名 / 手机号 / 货品 / 备注</span>
+              <span>{owner ? '顾客姓名 / 手机号 / 货品 / 备注' : '顾客姓名 / 手机号 / 备注'}</span>
               <input
                 name="keyword"
                 value={draftFilters.keyword}
@@ -150,7 +163,7 @@ export function Query() {
               />
             </label>
           </div>
-          <div className="query-filter-row query-filter-row--secondary">
+          <div className={`query-filter-row ${owner ? 'query-filter-row--secondary' : 'query-filter-row--employee-secondary'}`}>
             <label className="field">
               <span>收入一级项目</span>
               <select name="categoryId" value={draftFilters.categoryId} onChange={(event) => updateDraftFilters({ ...draftFilters, categoryId: event.target.value })}>
@@ -177,19 +190,26 @@ export function Query() {
                 ))}
               </select>
             </label>
-            <label className="field">
-              <span>记账人</span>
-              <select
-                name="createdBy"
-                value={draftFilters.createdBy}
-                onChange={(event) => updateDraftFilters({ ...draftFilters, createdBy: event.target.value as QueryFilters['createdBy'] })}
-              >
-                <option value="all">全部</option>
-                <option value="mom">{roleText.mom}</option>
-                <option value="dad">{roleText.dad}</option>
-                <option value="unknown">{roleText.unknown}</option>
-              </select>
-            </label>
+            {owner ? (
+              <label className="field">
+                <span>记账人</span>
+                <select
+                  name="createdByUserId"
+                  value={draftFilters.createdByUserId}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    const option = bookkeeperOptions.find((item) => item.value === value);
+                    updateDraftFilters({ ...draftFilters, createdByUserId: value, createdBy: option?.createdBy ?? 'all' });
+                  }}
+                >
+                  {bookkeeperOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
         </div>
         <div className="button-row query-actions">
@@ -236,12 +256,25 @@ export function Query() {
           <span>
             收入<strong>{formatMoney(stats.income)}</strong>
           </span>
-          <span>
-            支出<strong>{formatMoney(stats.expense)}</strong>
-          </span>
-          <span>
-            净额<strong>{formatMoney(stats.net)}</strong>
-          </span>
+          {owner ? (
+            <>
+              <span>
+                支出<strong>{formatMoney(stats.expense)}</strong>
+              </span>
+              <span>
+                净额<strong>{formatMoney(stats.net)}</strong>
+              </span>
+            </>
+          ) : (
+            <>
+              <span>
+                我的笔数<strong>{stats.incomeCount} 笔</strong>
+              </span>
+              <span>
+                客单价<strong>{formatMoney(stats.averageTicket)}</strong>
+              </span>
+            </>
+          )}
         </div>
       </section>
       <section>
@@ -255,8 +288,8 @@ export function Query() {
               <TransactionCard
                 key={transaction._id}
                 transaction={transaction}
-                onEdit={() => navigate('editTransaction', { id: transaction._id ?? '' })}
-                onDelete={() => setDeleteTarget(transaction)}
+                onEdit={canEditTransaction(session, transaction) ? () => navigate('editTransaction', { id: transaction._id ?? '' }) : undefined}
+                onDelete={canDeleteTransaction(session, transaction) ? () => setDeleteTarget(transaction) : undefined}
               />
             ))}
           </div>
@@ -282,21 +315,30 @@ function customersForRows(rows: Transaction[], customers: Customer[]) {
     return rows.some((row) => {
       if (customer._id && row.customerId === customer._id) return true;
       if (customer.phone && row.customerPhone && customer.phone === row.customerPhone) return true;
-      return Boolean(customer.name && row.customerName && customer.name === row.customerName);
+      return Boolean(
+        customer.name &&
+          row.customerName &&
+          !customer.phone &&
+          !row.customerPhone &&
+          customer.name === row.customerName
+      );
     });
   });
 }
 
-function filtersFromForm(form: HTMLFormElement, fallback: QueryFilters): QueryFilters {
+function filtersFromForm(form: HTMLFormElement, fallback: QueryFilters, bookkeeperOptions: BookkeeperOption[]): QueryFilters {
   const values = new FormData(form);
   const type = parseTransactionType(values.get('type'), fallback.type);
+  const createdByUserId = String(values.get('createdByUserId') ?? fallback.createdByUserId);
+  const option = bookkeeperOptions.find((item) => item.value === createdByUserId);
   return {
     ...fallback,
     type,
     keyword: String(values.get('keyword') ?? fallback.keyword),
     categoryId: type === 'expense' ? '' : String(values.get('categoryId') ?? fallback.categoryId),
     paymentMethodId: String(values.get('paymentMethodId') ?? fallback.paymentMethodId),
-    createdBy: parseCreatedBy(values.get('createdBy'), fallback.createdBy)
+    createdByUserId,
+    createdBy: option?.createdBy ?? parseCreatedByFromUserFilter(createdByUserId, fallback.createdBy)
   };
 }
 
@@ -308,4 +350,34 @@ function parseTransactionType(value: FormDataEntryValue | null, fallback: QueryF
 function parseCreatedBy(value: FormDataEntryValue | null, fallback: QueryFilters['createdBy']): QueryFilters['createdBy'] {
   if (value === 'mom' || value === 'dad' || value === 'unknown' || value === 'all') return value;
   return fallback;
+}
+
+function parseCreatedByFromUserFilter(value: string, fallback: QueryFilters['createdBy']): QueryFilters['createdBy'] {
+  if (!value.startsWith('legacy:')) return fallback;
+  return parseCreatedBy(value.slice('legacy:'.length), fallback);
+}
+
+function makeBookkeeperOptions(users: StoreUser[]): BookkeeperOption[] {
+  const liveUsers = users
+    .filter((user) => !user.deletedAt)
+    .sort((a, b) => Number(b.role === 'owner') - Number(a.role === 'owner') || a.displayName.localeCompare(b.displayName, 'zh-CN'));
+  const options: BookkeeperOption[] = [{ value: 'all', label: '全部', createdBy: 'all' }];
+  const coveredLegacyRoles = new Set<Role>();
+
+  liveUsers.forEach((user) => {
+    if (user.legacyRole) coveredLegacyRoles.add(user.legacyRole);
+    options.push({
+      value: `user:${user._id ?? user.username}`,
+      label: `${user.displayName}${user.role === 'employee' ? '（员工）' : ''}`,
+      createdBy: user.legacyRole ?? 'all'
+    });
+  });
+
+  (['mom', 'dad', 'unknown'] as Role[]).forEach((role) => {
+    if (!coveredLegacyRoles.has(role)) {
+      options.push({ value: `legacy:${role}`, label: roleText[role], createdBy: role });
+    }
+  });
+
+  return options;
 }

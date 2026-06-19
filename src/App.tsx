@@ -17,8 +17,11 @@ import { Settings } from './pages/Settings';
 import { ProjectManagement } from './pages/ProjectManagement';
 import { Backup } from './pages/Backup';
 import { EditTransaction } from './pages/EditTransaction';
+import { EmployeeManagement } from './pages/EmployeeManagement';
+import { canAccessRoute } from './utils/permissions';
 
 const emptyData = (): AppData => ({
+  storeUsers: [],
   customers: [],
   serviceCategories: [],
   serviceItems: [],
@@ -62,7 +65,7 @@ export function App() {
     if (!session) return;
     setLoading(true);
     try {
-      const next = await loadAllData(session.storeId);
+      const next = await loadAllData(session.storeId, session);
       setData(next);
       saveCachedData(session.storeId, next);
       setStale(false);
@@ -112,6 +115,12 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    if (!session || canAccessRoute(session, routeState.route)) return;
+    setToast({ kind: 'info', message: '当前账号无权限访问' });
+    navigate('dashboard');
+  }, [session, routeState.route, navigate]);
+
   const contextValue = useMemo(
     () =>
       session
@@ -139,10 +148,12 @@ export function App() {
     return <Login onLogin={setSession} />;
   }
 
+  const currentRoute = canAccessRoute(session, routeState.route) ? routeState.route : 'dashboard';
+
   return (
     <AppContext.Provider value={contextValue}>
       <div className="app-shell">
-        {loading && !data.serviceCategories.length ? <Loading text="正在读取云端账本..." /> : <CurrentPage route={routeState.route} />}
+        {loading && !data.serviceCategories.length ? <Loading text="正在读取云端账本..." /> : <CurrentPage route={currentRoute} />}
         <BottomNav />
         {toast ? <div className={`toast toast--${toast.kind}`}>{toast.message}</div> : null}
       </div>
@@ -159,6 +170,7 @@ function CurrentPage({ route }: { route: AppRoute }) {
   if (route === 'settings') return <Settings />;
   if (route === 'projects') return <ProjectManagement />;
   if (route === 'backup') return <Backup />;
+  if (route === 'employeeManagement') return <EmployeeManagement />;
   if (route === 'editTransaction') return <EditTransaction />;
   return <Dashboard />;
 }

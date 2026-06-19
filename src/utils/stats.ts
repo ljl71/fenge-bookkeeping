@@ -35,11 +35,15 @@ export function customerStats(customer: Customer, transactions: Transaction[]) {
   const customerPhone = normalizePhone(customer.phone);
   const rows = sortByDateDesc(
     activeTransactions(transactions).filter(
-      (row) =>
-        row.type === 'income' &&
-        (row.customerId === customer._id ||
-          (customerPhone && normalizePhone(row.customerPhone) === customerPhone) ||
-          row.customerName === customer.name)
+      (row) => {
+        const rowPhone = normalizePhone(row.customerPhone);
+        return (
+          row.type === 'income' &&
+          ((customer._id && row.customerId === customer._id) ||
+            (customerPhone && rowPhone === customerPhone) ||
+            (!customerPhone && !rowPhone && row.customerName === customer.name))
+        );
+      }
     )
   );
   const total = sumMoney(rows.map((row) => row.totalAmount));

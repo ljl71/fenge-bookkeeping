@@ -4,6 +4,7 @@ import { cloudAdd, cloudList, cloudUpdate } from '../cloudbase/db';
 import { localDatabase } from './localDatabase';
 
 const storeScopedCollections = new Set<CollectionName>([
+  'storeUsers',
   'customers',
   'serviceCategories',
   'serviceItems',
@@ -26,6 +27,16 @@ export async function listCollection<T>(collection: CollectionName, storeId: str
   if (isStoreScoped(collection) && !storeId) throw new Error('缺少店铺 ID，无法读取数据');
   if (isDemoMode) return localDatabase.list<T>(collection, storeId);
   return cloudList<T>(collection, { storeId });
+}
+
+export async function listCollectionWhere<T>(
+  collection: CollectionName,
+  storeId: string,
+  where: Record<string, unknown>
+): Promise<T[]> {
+  if (isStoreScoped(collection) && !storeId) throw new Error('缺少店铺 ID，无法读取数据');
+  if (isDemoMode) return localDatabase.list<T>(collection, storeId).filter((row) => matchesWhere(row, where));
+  return cloudList<T>(collection, { ...where, storeId });
 }
 
 export async function addRecord<T extends { _id?: string }>(
@@ -54,4 +65,9 @@ export async function updateRecord<T extends { _id?: string; storeId?: string }>
     return;
   }
   await cloudUpdate<T>(collection, id, patch, storeId);
+}
+
+function matchesWhere(row: unknown, where: Record<string, unknown>) {
+  if (typeof row !== 'object' || row === null) return false;
+  return Object.entries(where).every(([key, value]) => (row as Record<string, unknown>)[key] === value);
 }

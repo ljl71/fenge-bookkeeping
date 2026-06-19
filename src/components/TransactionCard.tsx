@@ -5,6 +5,7 @@ import { itemsText } from '../utils/exportCsv';
 import { signedMoney } from '../utils/money';
 import { displayPhone } from '../utils/phone';
 import { roleText } from '../constants/defaults';
+import { useApp } from '../AppContext';
 
 interface TransactionCardProps {
   transaction: Transaction;
@@ -13,9 +14,14 @@ interface TransactionCardProps {
 }
 
 export function TransactionCard({ transaction, onEdit, onDelete }: TransactionCardProps) {
+  const { session } = useApp();
   const isIncome = transaction.type === 'income';
   const dateLabel = monthDay(transaction.date);
   const [dateMonth, dateDay] = dateLabel.split('-');
+  const creatorLabel =
+    session.role === 'employee' && transaction.createdByUserId === session.userId
+      ? '我'
+      : transaction.createdByName || roleText[transaction.createdBy ?? 'unknown'];
 
   return (
     <article className={`transaction-card ${isIncome ? 'is-income' : 'is-expense'}`}>
@@ -29,7 +35,7 @@ export function TransactionCard({ transaction, onEdit, onDelete }: TransactionCa
           <p>{itemsText(transaction)}</p>
           <small>
             {isIncome ? displayPhone(transaction.customerPhone) : transaction.expenseCategoryName} ·{' '}
-            {transaction.paymentMethodName} · {roleText[transaction.createdBy ?? 'unknown']}
+            {transaction.paymentMethodName} · 记账人：{creatorLabel}
           </small>
         </div>
       </div>

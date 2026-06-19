@@ -1,7 +1,7 @@
 import type { Customer, Transaction } from '../types';
 import { nowIso } from '../utils/date';
 import { normalizePhone, phoneMatches } from '../utils/phone';
-import { addRecord, listCollection, updateRecord } from './dataSource';
+import { addRecord, listCollection, listCollectionWhere, updateRecord } from './dataSource';
 
 export async function listCustomers(storeId: string): Promise<Customer[]> {
   const rows = await listCollection<Customer>('customers', storeId);
@@ -53,20 +53,13 @@ export async function softDeleteCustomer(customer: Customer) {
 }
 
 export async function findOrCreateCustomer(storeId: string, input: { name: string; phone?: string; note?: string }) {
-  const customers = await listCustomers(storeId);
   const name = input.name.trim();
   const normalizedPhone = normalizePhone(input.phone);
   if (!name) throw new Error('请填写顾客姓名');
   if (!normalizedPhone) throw new Error('请填写手机号');
   if (normalizedPhone.length !== 11) throw new Error('请填写 11 位手机号');
-  const lowerName = name.toLowerCase();
-  const found = customers.find((customer) => {
-    const customerName = customer.name.trim().toLowerCase();
-    const customerPhone = normalizePhone(customer.phone);
-    if (customerPhone && phoneMatches(customerPhone, normalizedPhone)) return true;
-    if (customerName && customerPhone && customerName.includes(lowerName) && customerPhone === normalizedPhone) return true;
-    return false;
-  });
+  const customers = await listCollectionWhere<Customer>('customers', storeId, { phone: normalizedPhone });
+  const found = customers.find((customer) => !customer.deletedAt && normalizePhone(customer.phone) === normalizedPhone);
 
   if (found) {
     const patch: Partial<Customer> = {};
@@ -87,12 +80,14 @@ export async function findOrCreateCustomer(storeId: string, input: { name: strin
 
 export function customerConsumptionRows(customer: Customer, transactions: Transaction[]) {
   const customerPhone = normalizePhone(customer.phone);
-  return transactions.filter(
-    (row) =>
+  return transactions.filter((row) => {
+    const rowPhone = normalizePhone(row.customerPhone);
+    return (
       !row.deletedAt &&
       row.type === 'income' &&
-      (row.customerId === customer._id ||
-        (customerPhone && normalizePhone(row.customerPhone) === customerPhone) ||
-        row.customerName === customer.name)
-  );
+      ((customer._id && row.customerId === customer._id) ||
+        (customerPhone && rowPhone === customerPhone) ||
+        (!customerPhone && !rowPhone && row.customerName === customer.name))
+    );
+  });
 }

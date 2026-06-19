@@ -8,12 +8,14 @@ import { filterCustomers, saveCustomer } from '../services/customerService';
 import { customerStats } from '../utils/stats';
 import { formatMoney } from '../utils/money';
 import { displayPhone } from '../utils/phone';
+import { isOwner } from '../utils/permissions';
 
 const blankCustomer = { name: '', phone: '', note: '' };
 type CustomerDraft = Partial<Customer> & { name: string; phone: string };
 
 export function Customers() {
   const { session, data, refreshData, navigate, setToast } = useApp();
+  const owner = isOwner(session);
   const [draftKeyword, setDraftKeyword] = useState('');
   const [keyword, setKeyword] = useState('');
   const [editing, setEditing] = useState<CustomerDraft | null>(null);
@@ -42,10 +44,12 @@ export function Customers() {
       <PageHeader
         title="顾客"
         action={
+          owner ? (
           <button type="button" className="button button--ghost" onClick={() => setEditing(blankCustomer)}>
             <Plus size={18} />
             新增
           </button>
+          ) : null
         }
       />
       <form className="panel" onSubmit={searchCustomers}>
@@ -67,7 +71,7 @@ export function Customers() {
           </div>
         </label>
       </form>
-      {editing ? (
+      {owner && editing ? (
         <form className="panel" onSubmit={submit}>
           <div className="panel-title-row">
             <h2>{editing._id ? '编辑顾客信息' : '新增顾客'}</h2>
@@ -111,17 +115,19 @@ export function Customers() {
                     累计 {formatMoney(stats.total)} · {stats.count} 次 · 最近 {stats.lastDate ?? '暂无'}
                   </small>
                 </button>
-                <div className="icon-actions">
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => setEditing({ ...customer, name: customer.name, phone: customer.phone ?? '' })}
-                    aria-label="编辑顾客"
-                    title="编辑"
-                  >
-                    <Edit3 size={18} />
-                  </button>
-                </div>
+                {owner ? (
+                  <div className="icon-actions">
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => setEditing({ ...customer, name: customer.name, phone: customer.phone ?? '' })}
+                      aria-label="编辑顾客"
+                      title="编辑"
+                    >
+                      <Edit3 size={18} />
+                    </button>
+                  </div>
+                ) : null}
               </article>
             );
           })

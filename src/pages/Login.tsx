@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Store, UserRoundCheck } from 'lucide-react';
-import type { AppSession, Role } from '../types';
-import { DEMO_PIN, DEMO_STORE_ID, roleText } from '../constants/defaults';
+import type { AppSession } from '../types';
+import { DEMO_PIN, DEMO_STORE_ID } from '../constants/defaults';
 import { isDemoMode } from '../cloudbase/app';
 import { loginStore } from '../services/storeService';
 
@@ -11,8 +11,8 @@ interface LoginProps {
 
 export function Login({ onLogin }: LoginProps) {
   const [storeId, setStoreId] = useState(DEMO_STORE_ID);
+  const [username, setUsername] = useState('mom');
   const [pin, setPin] = useState('');
-  const [role, setRole] = useState<Role>('mom');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -21,7 +21,7 @@ export function Login({ onLogin }: LoginProps) {
     setSaving(true);
     setMessage('');
     try {
-      const session = await loginStore(storeId, pin, role);
+      const session = await loginStore(storeId, username, pin);
       onLogin(session);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '登录失败，请稍后重试');
@@ -40,7 +40,7 @@ export function Login({ onLogin }: LoginProps) {
         <p>手机端云同步记账，给家里小店用。</p>
         {isDemoMode ? (
           <div className="notice">
-            当前是本地演示模式，默认店铺 ID：{DEMO_STORE_ID}，PIN：{DEMO_PIN}。部署前请配置 CloudBase envId。
+            当前是本地演示模式，默认店铺 ID：{DEMO_STORE_ID}，账号：mom / dad / xiaowang，PIN：{DEMO_PIN}。部署前请配置 CloudBase envId。
           </div>
         ) : null}
         <label className="field">
@@ -48,7 +48,16 @@ export function Login({ onLogin }: LoginProps) {
           <input value={storeId} autoComplete="username" onChange={(event) => setStoreId(event.target.value)} />
         </label>
         <label className="field">
-          <span>店铺 PIN</span>
+          <span>账号</span>
+          <input
+            value={username}
+            autoComplete="username"
+            placeholder="例如 mom、dad、xiaowang"
+            onChange={(event) => setUsername(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>PIN</span>
           <input
             type="password"
             inputMode="numeric"
@@ -58,21 +67,7 @@ export function Login({ onLogin }: LoginProps) {
             onChange={(event) => setPin(event.target.value)}
           />
         </label>
-        <div className="field-group">
-          <span className="field-label">使用者身份</span>
-          <div className="segmented segmented--large">
-            {(['mom', 'dad', 'unknown'] as Role[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={role === item ? 'is-selected' : ''}
-                onClick={() => setRole(item)}
-              >
-                {roleText[item]}
-              </button>
-            ))}
-          </div>
-        </div>
+        <div className="notice">员工请使用店主分配的账号登录。</div>
         {message ? <div className="form-error">{message}</div> : null}
         <button type="submit" className="button button--primary button--block" disabled={saving}>
           <UserRoundCheck size={22} />

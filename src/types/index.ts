@@ -1,7 +1,9 @@
 export type Role = 'mom' | 'dad' | 'unknown';
+export type AccountRole = 'owner' | 'employee';
 export type TransactionType = 'income' | 'expense';
 export type CollectionName =
   | 'stores'
+  | 'storeUsers'
   | 'customers'
   | 'serviceCategories'
   | 'serviceItems'
@@ -13,9 +15,24 @@ export interface Store {
   _id?: string;
   storeId: string;
   name: string;
+  pinHash?: string;
   createdAt: string;
   updatedAt: string;
   active: boolean;
+}
+
+export interface StoreUser {
+  _id?: string;
+  storeId: string;
+  username: string;
+  displayName: string;
+  role: AccountRole;
+  legacyRole?: Role;
+  pinHash: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
 }
 
 export interface Customer {
@@ -101,6 +118,9 @@ export interface Transaction {
   date: string;
   note?: string;
   createdBy?: Role;
+  createdByUserId?: string;
+  createdByName?: string;
+  createdByRole?: AccountRole;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -109,13 +129,19 @@ export interface Transaction {
 export interface AppSession {
   storeId: string;
   storeName: string;
-  role: Role;
+  userId: string;
+  username: string;
+  displayName: string;
+  role: AccountRole;
+  legacyRole?: Role;
   loginToken: string;
   loginAt: string;
   expiresAt: string;
+  fallbackLogin?: boolean;
 }
 
 export interface AppData {
+  storeUsers: StoreUser[];
   customers: Customer[];
   serviceCategories: ServiceCategory[];
   serviceItems: ServiceItem[];
@@ -135,6 +161,7 @@ export interface QueryFilters {
   categoryId: string;
   paymentMethodId: string;
   createdBy: 'all' | Role;
+  createdByUserId: 'all' | string;
 }
 
 export interface StatsSummary {

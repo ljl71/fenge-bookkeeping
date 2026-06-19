@@ -1,7 +1,15 @@
-import type { Customer, QueryFilters, Transaction } from '../types';
+import type { AppSession, Customer, QueryFilters, Transaction } from '../types';
 import { nowIso } from '../utils/date';
 import { isPurchaseExpense, PURCHASE_EXPENSE_CATEGORY_ID, PURCHASE_EXPENSE_CATEGORY_NAME } from '../utils/expense';
 import { roundMoney, sumMoney } from '../utils/money';
+import {
+  attachCreatorFields,
+  canCreateExpense,
+  canCreateIncome,
+  canDeleteTransaction,
+  canEditTransaction,
+  canViewTransaction
+} from '../utils/permissions';
 import { normalizePhone, phoneMatches } from '../utils/phone';
 import { addRecord, listCollection, updateRecord } from './dataSource';
 
@@ -14,9 +22,24 @@ export async function listTransactions(storeId: string): Promise<Transaction[]> 
     .sort((a, b) => `${b.date}${b.createdAt}`.localeCompare(`${a.date}${a.createdAt}`));
 }
 
-export async function createTransaction(input: Omit<Transaction, '_id' | 'createdAt' | 'updatedAt'>): Promise<Transaction> {
+export async function listVisibleTransactions(session: AppSession): Promise<Transaction[]> {
+  const rows = await listTransactions(session.storeId);
+  return filterVisibleTransactions(rows, session);
+}
+
+export function filterVisibleTransactions(transactions: Transaction[], session: AppSession): Transaction[] {
+  return transactions.filter((row) => canViewTransaction(session, row));
+}
+
+export async function createTransaction(input: Omit<Transaction, '_id' | 'createdAt' | 'updatedAt'>, session?: AppSession): Promise<Transaction> {
   const now = nowIso();
-  const payload = normalizeTransaction(input);
+  if (session) {
+    if (input.storeId && input.storeId !== session.storeId) throw new Error('流水店铺不一致，已拒绝保存');
+    if (input.type === 'income' && !canCreateIncome(session)) throw new Error('当前账号不能新增收入');
+    if (input.type === 'expense' && !canCreateExpense(session)) throw new Error('当前账号不能新增支出');
+  }
+  const withCreator = session ? attachCreatorFields(input, session) : input;
+  const payload = normalizeTransaction(withCreator);
   return addRecord<Transaction>('transactions', {
     ...payload,
     createdAt: now,
@@ -25,24 +48,27 @@ export async function createTransaction(input: Omit<Transaction, '_id' | 'create
   });
 }
 
-export async function updateTransaction(transaction: Transaction): Promise<void> {
+export async function updateTransaction(transaction: Transaction, session?: AppSession): Promise<void> {
   if (!transaction._id) throw new Error('流水缺少 ID，无法保存');
-  const payload = normalizeTransaction(transaction);
+  if (session && !canEditTransaction(session, transaction)) throw new Error('当前账号无权限编辑这条流水');
+  const withCreator = session?.role === 'employee' ? attachCreatorFields(transaction, session) : transaction;
+  const payload = normalizeTransaction(withCreator);
   await updateRecord<Transaction>('transactions', transaction._id, {
     ...payload,
     updatedAt: nowIso()
   }, transaction.storeId);
 }
 
-export async function softDeleteTransaction(transaction: Transaction): Promise<void> {
+export async function softDeleteTransaction(transaction: Transaction, session?: AppSession): Promise<void> {
   if (!transaction._id) throw new Error('流水缺少 ID，无法删除');
+  if (session && !canDeleteTransaction(session, transaction)) throw new Error('当前账号无权限删除这条流水');
   await updateRecord<Transaction>('transactions', transaction._id, {
     deletedAt: nowIso(),
     updatedAt: nowIso()
   }, transaction.storeId);
 }
 
-export function filterTransactions(transactions: Transaction[], filters: QueryFilters, customers: Customer[] = []): Transaction[] {
+export function filterTransactions(transactions: Transaction[], filters: QueryFilters, customers: Customer[] = [], session?: AppSession): Transaction[] {
   const keyword = filters.keyword.trim().toLowerCase();
   const matchedCustomers = keyword
     ? customers.filter((customer) => {
@@ -50,12 +76,14 @@ export function filterTransactions(transactions: Transaction[], filters: QueryFi
         return customer.name.toLowerCase().includes(keyword) || phoneMatches(customer.phone, keyword);
       })
     : [];
-  return transactions.filter((row) => {
+  const visibleRows = session ? filterVisibleTransactions(transactions, session) : transactions;
+  return visibleRows.filter((row) => {
     if (row.deletedAt) return false;
+    if (session?.role === 'employee' && row.type !== 'income') return false;
     if (row.type === 'expense' && !isPurchaseExpense(row)) return false;
     if (filters.type !== 'all' && row.type !== filters.type) return false;
     if (row.date < filters.startDate || row.date > filters.endDate) return false;
-    if (filters.createdBy !== 'all' && row.createdBy !== filters.createdBy) return false;
+    if (!matchesBookkeeper(row, filters)) return false;
     if (filters.paymentMethodId && row.paymentMethodId !== filters.paymentMethodId) return false;
     if (filters.categoryId && (row.type !== 'income' || !(row.items ?? []).some((item) => item.categoryId === filters.categoryId))) return false;
     if (keyword) {
@@ -65,7 +93,13 @@ export function filterTransactions(transactions: Transaction[], filters: QueryFi
         const customerMatch = matchedCustomers.some((customer) => {
           if (customer._id && row.customerId === customer._id) return true;
           if (customer.phone && row.customerPhone && normalizePhone(customer.phone) === normalizePhone(row.customerPhone)) return true;
-          return Boolean(customer.name && row.customerName && customer.name === row.customerName);
+          return Boolean(
+            customer.name &&
+              row.customerName &&
+              !normalizePhone(customer.phone) &&
+              !normalizePhone(row.customerPhone) &&
+              customer.name === row.customerName
+          );
         });
         if (!nameMatch && !phoneMatch && !customerMatch) return false;
       } else {
@@ -108,7 +142,7 @@ function normalizeTransaction<T extends TransactionDraft>(transaction: T): T {
     const customerName = transaction.customerName?.trim() ?? '';
     const customerPhone = normalizePhone(transaction.customerPhone);
     if (!customerName) throw new Error('请填写顾客姓名');
-    if (customerPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
+    if (customerPhone && customerPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
 
     return {
       ...transaction,
@@ -134,6 +168,23 @@ function normalizeTransaction<T extends TransactionDraft>(transaction: T): T {
     items,
     note: transaction.note?.slice(0, 200) ?? ''
   } as T;
+}
+
+function matchesBookkeeper(row: Transaction, filters: QueryFilters): boolean {
+  const userFilter = filters.createdByUserId ?? 'all';
+  if (userFilter !== 'all') {
+    if (userFilter.startsWith('user:')) {
+      const userId = userFilter.slice('user:'.length);
+      if (row.createdByUserId === userId) return true;
+      return Boolean(!row.createdByUserId && filters.createdBy !== 'all' && row.createdBy === filters.createdBy);
+    }
+    if (userFilter.startsWith('legacy:')) {
+      return row.createdBy === userFilter.slice('legacy:'.length);
+    }
+    return row.createdByUserId === userFilter;
+  }
+  if (filters.createdBy !== 'all' && row.createdBy !== filters.createdBy) return false;
+  return true;
 }
 
 function normalizeIncomeItems(items: Transaction['items']) {
