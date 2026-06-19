@@ -9,7 +9,9 @@ import {
   saveServiceCategory,
   saveServiceItem,
   softDeleteConfig,
-  toggleConfig
+  toggleConfig,
+  uniqueActiveOptions,
+  uniqueConfigRows
 } from '../services/configService';
 
 type DeleteTarget =
@@ -23,6 +25,10 @@ export function ProjectManagement() {
   const [serviceItem, setServiceItem] = useState<Partial<ServiceItem>>({ name: '', categoryId: '', defaultPrice: 0, sortOrder: 99, active: true });
   const [paymentMethod, setPaymentMethod] = useState<Partial<PaymentMethod>>({ name: '', sortOrder: 99, active: true });
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const categoryOptions = uniqueActiveOptions(data.serviceCategories);
+  const serviceItemRows = serviceItem.categoryId
+    ? data.serviceItems.filter((row) => row.categoryId === serviceItem.categoryId)
+    : data.serviceItems;
 
   async function run(action: () => Promise<unknown>, success: string) {
     try {
@@ -54,7 +60,7 @@ export function ProjectManagement() {
       />
       <ConfigSection title="收入一级项目">
         <form
-          className="inline-form inline-form--service-item"
+          className="config-form config-form--category"
           onSubmit={(event) => {
             event.preventDefault();
             run(
@@ -67,11 +73,10 @@ export function ProjectManagement() {
           }}
         >
           <input placeholder="名称" value={serviceCategory.name ?? ''} onChange={(event) => setServiceCategory({ ...serviceCategory, name: event.target.value })} />
-          <input
-            type="number"
-            placeholder="排序"
+          <LabeledNumberInput
+            label="序号"
             value={serviceCategory.sortOrder ?? 99}
-            onChange={(event) => setServiceCategory({ ...serviceCategory, sortOrder: Number(event.target.value) })}
+            onChange={(value) => setServiceCategory({ ...serviceCategory, sortOrder: value })}
           />
           <button type="submit" className="button button--primary">
             <Save size={18} />
@@ -88,7 +93,7 @@ export function ProjectManagement() {
 
       <ConfigSection title="收入子项目">
         <form
-          className="inline-form"
+          className="config-form config-form--service-item"
           onSubmit={(event) => {
             event.preventDefault();
             const category = data.serviceCategories.find((row) => row._id === serviceItem.categoryId);
@@ -108,27 +113,23 @@ export function ProjectManagement() {
         >
           <select value={serviceItem.categoryId ?? ''} onChange={(event) => setServiceItem({ ...serviceItem, categoryId: event.target.value })}>
             <option value="">选择一级项目</option>
-            {data.serviceCategories
-              .filter((row) => !row.deletedAt)
-              .map((category) => (
+            {categoryOptions.map((category) => (
                 <option key={category._id} value={category._id}>
                   {category.name}
                 </option>
               ))}
           </select>
           <input placeholder="子项目名称" value={serviceItem.name ?? ''} onChange={(event) => setServiceItem({ ...serviceItem, name: event.target.value })} />
-          <input
-            type="number"
+          <LabeledNumberInput
+            label="金额"
             inputMode="decimal"
-            placeholder="默认价格"
             value={serviceItem.defaultPrice ?? 0}
-            onChange={(event) => setServiceItem({ ...serviceItem, defaultPrice: Number(event.target.value) })}
+            onChange={(value) => setServiceItem({ ...serviceItem, defaultPrice: value })}
           />
-          <input
-            type="number"
-            placeholder="排序"
+          <LabeledNumberInput
+            label="序号"
             value={serviceItem.sortOrder ?? 99}
-            onChange={(event) => setServiceItem({ ...serviceItem, sortOrder: Number(event.target.value) })}
+            onChange={(value) => setServiceItem({ ...serviceItem, sortOrder: value })}
           />
           <button type="submit" className="button button--primary">
             <Save size={18} />
@@ -136,7 +137,8 @@ export function ProjectManagement() {
           </button>
         </form>
         <ConfigList
-          rows={data.serviceItems}
+          rows={serviceItemRows}
+          getKey={(row) => `${row.categoryId || row.categoryName}:${normalizeListKey(row.name)}`}
           renderName={(row) => `${row.categoryName} / ${row.name}${row.defaultPrice ? ` · ¥${row.defaultPrice}` : ''}`}
           onEdit={setServiceItem}
           onToggle={(row) => run(() => toggleConfig('serviceItems', row), row.active ? '已停用' : '已启用')}
@@ -177,6 +179,25 @@ function ConfigSection({ title, children }: { title: string; children: React.Rea
   );
 }
 
+function LabeledNumberInput(props: {
+  label: string;
+  value: number;
+  inputMode?: 'decimal' | 'numeric';
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="labeled-number-input">
+      <span>{props.label}</span>
+      <input
+        type="number"
+        inputMode={props.inputMode}
+        value={props.value}
+        onChange={(event) => props.onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
 function SimpleConfigForm<T extends { name?: string; sortOrder?: number }>(
   props: {
     value: Partial<T>;
@@ -186,18 +207,17 @@ function SimpleConfigForm<T extends { name?: string; sortOrder?: number }>(
 ) {
   return (
     <form
-      className="inline-form"
+      className="config-form config-form--simple"
       onSubmit={(event) => {
         event.preventDefault();
         props.onSubmit();
       }}
     >
       <input placeholder="名称" value={props.value.name ?? ''} onChange={(event) => props.onChange({ ...props.value, name: event.target.value } as Partial<T>)} />
-      <input
-        type="number"
-        placeholder="排序"
+      <LabeledNumberInput
+        label="序号"
         value={props.value.sortOrder ?? 99}
-        onChange={(event) => props.onChange({ ...props.value, sortOrder: Number(event.target.value) } as Partial<T>)}
+        onChange={(value) => props.onChange({ ...props.value, sortOrder: value } as Partial<T>)}
       />
       <button type="submit" className="button button--primary">
         <Save size={18} />
@@ -209,6 +229,7 @@ function SimpleConfigForm<T extends { name?: string; sortOrder?: number }>(
 
 function ConfigList<T extends { _id?: string; name: string; active: boolean; sortOrder: number; deletedAt?: string | null }>(props: {
   rows: T[];
+  getKey?: (row: T) => string;
   renderName?: (row: T) => string;
   onEdit: (row: T) => void;
   onToggle: (row: T) => void;
@@ -216,9 +237,7 @@ function ConfigList<T extends { _id?: string; name: string; active: boolean; sor
 }) {
   return (
     <div className="config-list">
-      {props.rows
-        .filter((row) => !row.deletedAt)
-        .sort((a, b) => a.sortOrder - b.sortOrder)
+      {uniqueConfigRows(props.rows, props.getKey)
         .map((row) => (
           <div key={row._id}>
             <span>
@@ -240,4 +259,8 @@ function ConfigList<T extends { _id?: string; name: string; active: boolean; sor
         ))}
     </div>
   );
+}
+
+function normalizeListKey(value: string): string {
+  return value.trim().replace(/\s+/g, '').toLowerCase();
 }

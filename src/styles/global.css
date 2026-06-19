@@ -972,6 +972,74 @@ textarea {
   font-weight: 800;
 }
 
+.config-form {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+}
+
+.config-form--category,
+.config-form--simple {
+  grid-template-columns: minmax(0, 1fr) 90px 112px;
+}
+
+.config-form--service-item {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 104px;
+}
+
+.config-form--service-item select {
+  grid-column: 1 / 2;
+}
+
+.config-form--service-item > input {
+  grid-column: 2 / -1;
+}
+
+.config-form--service-item .button {
+  min-width: 0;
+}
+
+.labeled-number-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+.labeled-number-input:focus-within {
+  border-color: var(--pink);
+  box-shadow: var(--focus);
+}
+
+.labeled-number-input span {
+  flex: 0 0 auto;
+  color: #6b7482;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.labeled-number-input input {
+  min-width: 0;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.labeled-number-input input:focus {
+  box-shadow: none;
+}
+
 .inline-form {
   display: grid;
   grid-template-columns: 1fr 92px auto;
@@ -1060,8 +1128,18 @@ textarea {
   }
 
   .inline-form,
-  .inline-form--service-item {
+  .inline-form--service-item,
+  .config-form,
+  .config-form--category,
+  .config-form--simple,
+  .config-form--service-item {
     grid-template-columns: 1fr;
+  }
+
+  .config-form--service-item select,
+  .config-form--service-item > input,
+  .config-form--service-item .button {
+    grid-column: auto;
   }
 
   .search-row {

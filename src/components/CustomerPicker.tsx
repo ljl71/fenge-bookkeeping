@@ -1,6 +1,5 @@
 import type { Customer } from '../types';
-import { filterCustomers } from '../services/customerService';
-import { maskPhone } from '../utils/phone';
+import { maskPhone, normalizePhone, phoneMatches } from '../utils/phone';
 
 interface CustomerPickerProps {
   customers: Customer[];
@@ -23,8 +22,7 @@ export function CustomerPicker({
   onNoteChange,
   onPick
 }: CustomerPickerProps) {
-  const keyword = name || phone;
-  const matches = keyword ? filterCustomers(customers, keyword).slice(0, 5) : [];
+  const matches = getCustomerMatches(customers, name, phone);
   return (
     <div className="panel">
       <label className="field">
@@ -58,4 +56,25 @@ export function CustomerPicker({
       ) : null}
     </div>
   );
+}
+
+function getCustomerMatches(customers: Customer[], name: string, phone: string): Customer[] {
+  const nameKeyword = name.trim().toLowerCase();
+  const phoneKeyword = normalizePhone(phone);
+  if (!nameKeyword && !phoneKeyword) return [];
+
+  const hasExactMatch = customers.some((customer) => {
+    return customer.name.trim().toLowerCase() === nameKeyword && normalizePhone(customer.phone) === phoneKeyword;
+  });
+  if (hasExactMatch) return [];
+
+  return customers
+    .filter((customer) => {
+      if (customer.deletedAt) return false;
+      const nameMatch = Boolean(nameKeyword && customer.name.toLowerCase().includes(nameKeyword));
+      const noteMatch = Boolean(nameKeyword && (customer.note ?? '').toLowerCase().includes(nameKeyword));
+      const phoneMatch = Boolean(phoneKeyword && phoneMatches(customer.phone, phoneKeyword));
+      return nameMatch || noteMatch || phoneMatch;
+    })
+    .slice(0, 5);
 }

@@ -1,5 +1,5 @@
 import type { ServiceCategory, ServiceItem, TransactionItem } from '../types';
-import { activeOptions } from '../services/configService';
+import { uniqueActiveOptions, uniqueActiveServiceItems } from '../services/configService';
 import { MoneyInput } from './MoneyInput';
 
 interface ServiceItemSelectorProps {
@@ -11,8 +11,8 @@ interface ServiceItemSelectorProps {
 }
 
 export function ServiceItemSelector({ categories, items, value, onChange, onRemove }: ServiceItemSelectorProps) {
-  const categoryOptions = activeOptions(categories);
-  const itemOptions = activeOptions(items).filter((item) => item.categoryId === value.categoryId);
+  const categoryOptions = uniqueActiveOptions(categories);
+  const itemOptions = uniqueActiveServiceItems(items, value.categoryId);
   const selectedCategory = categories.find((category) => category._id === value.categoryId);
 
   return (

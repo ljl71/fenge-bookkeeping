@@ -8,6 +8,7 @@ import { EmptyState } from '../components/EmptyState';
 import { PageHeader } from '../components/PageHeader';
 import { TransactionCard } from '../components/TransactionCard';
 import { roleText } from '../constants/defaults';
+import { uniqueActiveOptions } from '../services/configService';
 import { filterTransactions, softDeleteTransaction } from '../services/transactionService';
 import { getDateRange } from '../utils/date';
 import { makeFengeWorkbook } from '../utils/excel';
@@ -56,6 +57,7 @@ export function Query() {
 
   function updateDraftFilters(next: QueryFilters) {
     setDraftFilters(next);
+    setAppliedFilters(next);
     setExportOpen(false);
   }
 
@@ -168,7 +170,7 @@ export function Query() {
               <span>收入一级项目</span>
               <select name="categoryId" value={draftFilters.categoryId} onChange={(event) => updateDraftFilters({ ...draftFilters, categoryId: event.target.value })}>
                 <option value="">全部</option>
-                {data.serviceCategories.filter((category) => !category.deletedAt).map((category) => (
+                {uniqueActiveOptions(data.serviceCategories).map((category) => (
                   <option key={category._id} value={category._id}>
                     {category.name}
                   </option>
@@ -183,7 +185,7 @@ export function Query() {
                 onChange={(event) => updateDraftFilters({ ...draftFilters, paymentMethodId: event.target.value })}
               >
                 <option value="">全部</option>
-                {data.paymentMethods.filter((method) => !method.deletedAt).map((method) => (
+                {uniqueActiveOptions(data.paymentMethods).map((method) => (
                   <option key={method._id} value={method._id}>
                     {method.name}
                   </option>

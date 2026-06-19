@@ -9,6 +9,26 @@ export function activeOptions<T extends ListOption>(rows: T[]): T[] {
   return rows.filter((row) => !row.deletedAt && row.active).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+export function uniqueActiveOptions<T extends ListOption>(rows: T[]): T[] {
+  return uniqueBy(activeOptions(rows), (row) => normalizeConfigName(row.name));
+}
+
+export function uniqueActiveServiceItems(rows: ServiceItem[], categoryId?: string): ServiceItem[] {
+  return uniqueBy(
+    activeOptions(rows).filter((row) => !categoryId || row.categoryId === categoryId),
+    (row) => `${row.categoryId || row.categoryName}:${normalizeConfigName(row.name)}`
+  );
+}
+
+export function uniqueConfigRows<T extends ListOption>(rows: T[], getKey: (row: T) => string = (row) => normalizeConfigName(row.name)): T[] {
+  return uniqueBy(
+    rows
+      .filter((row) => !row.deletedAt)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+    getKey
+  );
+}
+
 export async function saveServiceCategory(
   storeId: string,
   input: Partial<ServiceCategory> & { name: string }
@@ -85,4 +105,18 @@ export async function toggleConfig<T extends ConfigRecord>(collection: ConfigCol
 export async function softDeleteConfig<T extends ConfigRecord>(collection: ConfigCollection, row: T) {
   if (!row._id) throw new Error('缺少 ID，无法删除');
   await updateRecord<T>(collection, row._id, { deletedAt: nowIso(), updatedAt: nowIso(), active: false } as Partial<T>, row.storeId);
+}
+
+function uniqueBy<T>(rows: T[], getKey: (row: T) => string): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = getKey(row);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeConfigName(value: string): string {
+  return value.trim().replace(/\s+/g, '').toLowerCase();
 }
