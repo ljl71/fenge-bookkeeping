@@ -26,10 +26,12 @@ export async function callLoginStoreFunction(storeId: string, username: string, 
   const app = getCloudbaseApp();
   if (!app) throw new Error('CloudBase 未配置，无法登录');
   await ensureCloudbaseAuth();
+  const normalizedUsername = username.trim();
+  const data = normalizedUsername ? { storeId, username: normalizedUsername, pin } : { storeId, pin };
 
   const result = await app.callFunction({
     name: 'loginStore',
-    data: { storeId, username, pin }
+    data
   });
 
   const payload = result?.result ?? result;

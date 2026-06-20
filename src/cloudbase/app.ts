@@ -1,6 +1,7 @@
 import cloudbase from '@cloudbase/js-sdk';
 
-const envId = import.meta.env.VITE_CLOUDBASE_ENV_ID as string | undefined;
+const rawEnvId = import.meta.env.VITE_CLOUDBASE_ENV_ID as string | undefined;
+const envId = rawEnvId?.trim();
 const explicitDemo = import.meta.env.VITE_APP_DEMO_MODE === 'true';
 
 export const isDemoMode = explicitDemo || !envId || envId === 'your-cloudbase-env-id';

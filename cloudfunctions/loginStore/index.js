@@ -25,7 +25,11 @@ function hashSessionToken(token) {
   return crypto.createHash('sha256').update(`fenge-bookkeeping-session:${token}`).digest('hex');
 }
 
-function fail(code, message) {
+function makeLoginToken() {
+  return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : crypto.randomBytes(32).toString('hex');
+}
+
+function fail(message, code) {
   return {
     success: false,
     code,
@@ -37,16 +41,16 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function failSlow(message, code) {
+  await delay(FAILURE_DELAY_MS);
+  return fail(message, code);
+}
+
 function timingSafeEqualText(left, right) {
   const leftBuffer = Buffer.from(String(left || ''), 'utf8');
   const rightBuffer = Buffer.from(String(right || ''), 'utf8');
   if (leftBuffer.length !== rightBuffer.length) return false;
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-async function failSlow(code, message) {
-  await delay(FAILURE_DELAY_MS);
-  return fail(code, message);
 }
 
 function normalizeUsername(username) {
@@ -59,8 +63,13 @@ function legacyRoleFromUsername(username) {
   return 'unknown';
 }
 
-function canFallbackWithUsername(username) {
+function canUseStorePinAlias(username) {
   return !username || username === 'boss' || username === 'owner' || username === 'mom' || username === 'dad';
+}
+
+async function findStore(storeId) {
+  const result = await db.collection('stores').where({ storeId }).limit(1).get();
+  return result.data && result.data[0];
 }
 
 async function findStoreUser(storeId, username) {
@@ -69,16 +78,8 @@ async function findStoreUser(storeId, username) {
     const result = await db.collection('storeUsers').where({ storeId, username, active: true }).limit(5).get();
     return (result.data || []).find((user) => !user.deletedAt && normalizeUsername(user.username) === username) || null;
   } catch (error) {
+    // storeUsers is optional for the first CloudBase deployment.
     return null;
-  }
-}
-
-async function hasStoreUsers(storeId) {
-  try {
-    const result = await db.collection('storeUsers').where({ storeId }).limit(1).get();
-    return (result.data || []).some((user) => !user.deletedAt);
-  } catch (error) {
-    return false;
   }
 }
 
@@ -94,99 +95,104 @@ async function saveSession({ loginToken, storeId, userId, role, createdAt, expir
       revokedAt: null
     });
   } catch (error) {
+    // sessions is optional in the first version; login itself should still work.
     console.warn('save session failed', error);
   }
 }
 
-exports.main = async (event = {}) => {
-  const storeId = String(event.storeId || '').trim();
-  const username = normalizeUsername(event.username);
-  const pin = String(event.pin || '');
-
-  if (!storeId) return fail('MISSING_STORE_ID', '请填写店铺 ID');
-  if (!pin) return fail('MISSING_PIN', '请填写店铺 PIN');
-  if (storeId.length > MAX_STORE_ID_LENGTH || !/^[a-zA-Z0-9_-]+$/.test(storeId)) {
-    return fail('INVALID_STORE_ID', '店铺 ID 格式不正确');
-  }
-  if (username.length > MAX_USERNAME_LENGTH || (username && !/^[a-zA-Z0-9_-]+$/.test(username))) {
-    return fail('INVALID_USERNAME', '账号格式不正确');
-  }
-  if (pin.length > MAX_PIN_LENGTH) return fail('INVALID_PIN', '店铺 PIN 格式不正确');
-
-  const result = await db.collection('stores').where({ storeId }).limit(1).get();
-  const store = result.data && result.data[0];
-
-  if (!store) return failSlow('STORE_NOT_FOUND', '店铺不存在');
-  if (!store.active) return failSlow('STORE_DISABLED', '店铺已停用');
-
-  const storeUser = await findStoreUser(storeId, username);
-  if (storeUser) {
-    if (!timingSafeEqualText(hashStoreUserPin(storeId, storeUser.username, pin), storeUser.pinHash)) {
-      return failSlow('PIN_INCORRECT', 'PIN 错误');
-    }
-
-    const createdAt = new Date();
-    const expiresAt = new Date(createdAt.getTime() + TOKEN_TTL_MS);
-    const loginToken = crypto.randomBytes(32).toString('hex');
-    await saveSession({
-      loginToken,
-      storeId: store.storeId,
-      userId: storeUser._id,
-      role: storeUser.role || 'employee',
-      createdAt,
-      expiresAt
-    });
-
-    return {
-      success: true,
-      storeId: store.storeId,
-      storeName: store.name,
-      userId: storeUser._id,
-      username: storeUser.username,
-      displayName: storeUser.displayName,
-      role: storeUser.role || 'employee',
-      legacyRole: storeUser.legacyRole,
-      loginToken,
-      createdAt: createdAt.toISOString(),
-      expiresAt: expiresAt.toISOString()
-    };
-  }
-
-  if (!canFallbackWithUsername(username)) {
-    return failSlow('USER_NOT_FOUND', '账号不存在或已停用');
-  }
-  if (await hasStoreUsers(storeId)) {
-    return failSlow('USER_NOT_FOUND', '账号不存在或已停用');
-  }
-
-  if (!timingSafeEqualText(hashPin(pin), store.pinHash)) return failSlow('PIN_INCORRECT', 'PIN 错误');
-
-  const createdAt = new Date();
-  const expiresAt = new Date(createdAt.getTime() + TOKEN_TTL_MS);
-  const loginToken = crypto.randomBytes(32).toString('hex');
-  const legacyRole = legacyRoleFromUsername(username);
-  const userId = `legacy-${store.storeId}-${legacyRole}`;
-  await saveSession({
-    loginToken,
-    storeId: store.storeId,
-    userId,
-    role: 'owner',
-    createdAt,
-    expiresAt
-  });
-
+function makeSuccessPayload(store, loginToken, createdAt, expiresAt, extra = {}) {
   return {
     success: true,
     storeId: store.storeId,
     storeName: store.name,
-    userId,
-    username: username || 'owner',
-    displayName: legacyRole === 'mom' ? '妈妈' : legacyRole === 'dad' ? '爸爸' : '店主',
-    role: 'owner',
-    legacyRole,
     loginToken,
-    fallbackLogin: true,
     createdAt: createdAt.toISOString(),
-    expiresAt: expiresAt.toISOString()
+    expiresAt: expiresAt.toISOString(),
+    ...extra
   };
+}
+
+exports.main = async (event = {}) => {
+  try {
+    const storeId = String(event.storeId || '').trim();
+    const username = normalizeUsername(event.username);
+    const pin = String(event.pin || '').trim();
+
+    if (!storeId) return fail('请填写店铺 ID', 'MISSING_STORE_ID');
+    if (!pin) return fail('请填写 PIN', 'MISSING_PIN');
+    if (storeId.length > MAX_STORE_ID_LENGTH || !/^[a-zA-Z0-9_-]+$/.test(storeId)) {
+      return fail('店铺 ID 格式不正确', 'INVALID_STORE_ID');
+    }
+    if (username.length > MAX_USERNAME_LENGTH || (username && !/^[a-zA-Z0-9_-]+$/.test(username))) {
+      return fail('账号格式不正确', 'INVALID_USERNAME');
+    }
+    if (pin.length > MAX_PIN_LENGTH) return fail('PIN 格式不正确', 'INVALID_PIN');
+
+    const store = await findStore(storeId);
+    if (!store) return failSlow('店铺不存在', 'STORE_NOT_FOUND');
+    if (store.active === false) return failSlow('店铺已停用', 'STORE_DISABLED');
+    if (!store.pinHash) return fail('店铺未配置 pinHash，请先初始化 stores 数据', 'STORE_PIN_NOT_CONFIGURED');
+
+    const storeUser = await findStoreUser(storeId, username);
+    if (storeUser) {
+      if (!timingSafeEqualText(hashStoreUserPin(storeId, storeUser.username, pin), storeUser.pinHash)) {
+        return failSlow('PIN 错误', 'PIN_INCORRECT');
+      }
+
+      const createdAt = new Date();
+      const expiresAt = new Date(createdAt.getTime() + TOKEN_TTL_MS);
+      const loginToken = makeLoginToken();
+      const role = storeUser.role || 'employee';
+      await saveSession({
+        loginToken,
+        storeId: store.storeId,
+        userId: storeUser._id,
+        role,
+        createdAt,
+        expiresAt
+      });
+
+      return makeSuccessPayload(store, loginToken, createdAt, expiresAt, {
+        userId: storeUser._id,
+        username: storeUser.username,
+        displayName: storeUser.displayName,
+        role,
+        legacyRole: storeUser.legacyRole
+      });
+    }
+
+    if (username && !canUseStorePinAlias(username)) {
+      return failSlow('账号不存在或已停用', 'USER_NOT_FOUND');
+    }
+
+    if (!timingSafeEqualText(hashPin(pin), store.pinHash)) {
+      return failSlow('PIN 错误', 'PIN_INCORRECT');
+    }
+
+    const createdAt = new Date();
+    const expiresAt = new Date(createdAt.getTime() + TOKEN_TTL_MS);
+    const loginToken = makeLoginToken();
+    const legacyRole = legacyRoleFromUsername(username);
+    const userId = `legacy-${store.storeId}-${legacyRole}`;
+    await saveSession({
+      loginToken,
+      storeId: store.storeId,
+      userId,
+      role: 'owner',
+      createdAt,
+      expiresAt
+    });
+
+    return makeSuccessPayload(store, loginToken, createdAt, expiresAt, {
+      userId,
+      username: username || 'owner',
+      displayName: legacyRole === 'mom' ? '妈妈' : legacyRole === 'dad' ? '爸爸' : '店主',
+      role: 'owner',
+      legacyRole,
+      fallbackLogin: true
+    });
+  } catch (error) {
+    console.error('loginStore failed', error);
+    return fail(error && error.message ? `登录服务异常：${error.message}` : '登录服务异常，请稍后重试', 'INTERNAL_ERROR');
+  }
 };

@@ -11,7 +11,7 @@ interface LoginProps {
 
 export function Login({ onLogin }: LoginProps) {
   const [storeId, setStoreId] = useState(DEMO_STORE_ID);
-  const [username, setUsername] = useState('mom');
+  const [username, setUsername] = useState(() => (isDemoMode ? 'mom' : ''));
   const [pin, setPin] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -48,11 +48,11 @@ export function Login({ onLogin }: LoginProps) {
           <input value={storeId} autoComplete="username" onChange={(event) => setStoreId(event.target.value)} />
         </label>
         <label className="field">
-          <span>账号</span>
+          <span>账号（店主可留空）</span>
           <input
             value={username}
             autoComplete="username"
-            placeholder="例如 mom、dad、xiaowang"
+            placeholder="店主可留空；员工填写账号"
             onChange={(event) => setUsername(event.target.value)}
           />
         </label>
@@ -67,7 +67,7 @@ export function Login({ onLogin }: LoginProps) {
             onChange={(event) => setPin(event.target.value)}
           />
         </label>
-        <div className="notice">员工请使用店主分配的账号登录。</div>
+        <div className="notice">店主可直接用店铺 ID + PIN 登录；员工请使用店主分配的账号登录。</div>
         {message ? <div className="form-error">{message}</div> : null}
         <button type="submit" className="button button--primary button--block" disabled={saving}>
           <UserRoundCheck size={22} />
