@@ -79,19 +79,18 @@ export function EditTransaction() {
         const validItems = (next.items ?? []).filter((item) => item.categoryId && item.amount > 0);
         const cleanedPhone = normalizePhone(next.customerPhone);
         if (!next.customerName?.trim()) throw new Error('请填写顾客姓名');
-        if (cleanedPhone && cleanedPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
+        if (!cleanedPhone) throw new Error('请填写顾客手机号');
+        if (cleanedPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
         if (!validItems.length) throw new Error('请至少保留一个消费项目');
-        const customer = cleanedPhone
-          ? await findOrCreateCustomer(session.storeId, {
-              name: next.customerName,
-              phone: cleanedPhone
-            })
-          : null;
+        const customer = await findOrCreateCustomer(session.storeId, {
+          name: next.customerName,
+          phone: cleanedPhone
+        });
         next = {
           ...next,
-          customerId: customer?._id,
-          customerName: customer?.name ?? next.customerName.trim(),
-          customerPhone: customer?.phone ?? cleanedPhone,
+          customerId: customer._id,
+          customerName: customer.name,
+          customerPhone: customer.phone,
           items: validItems,
           totalAmount: sumMoney(validItems.map((item) => item.amount))
         };

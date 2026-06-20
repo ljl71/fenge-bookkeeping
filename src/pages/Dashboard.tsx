@@ -33,7 +33,6 @@ export function Dashboard() {
         }
       />
       {stale ? <div className="notice">当前可能不是最新数据，请检查网络后刷新。</div> : null}
-      {session.fallbackLogin ? <div className="notice">当前使用旧 PIN 兼容登录，建议到设置页初始化店主账号。</div> : null}
       <section className={employee ? 'quick-actions quick-actions--employee' : 'quick-actions'}>
         <button type="button" className="button button--primary" onClick={() => navigate('bookkeeping', { tab: 'income' })}>
           <PlusCircle size={22} />

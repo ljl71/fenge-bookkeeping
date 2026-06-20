@@ -34,7 +34,8 @@ export function CustomerPicker({
         <input
           value={phone}
           inputMode="numeric"
-          placeholder="11 位手机号，可选"
+          placeholder="11 位手机号"
+          required
           onChange={(event) => onPhoneChange(event.target.value)}
         />
       </label>

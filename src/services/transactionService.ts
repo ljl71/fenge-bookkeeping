@@ -142,7 +142,8 @@ function normalizeTransaction<T extends TransactionDraft>(transaction: T): T {
     const customerName = transaction.customerName?.trim() ?? '';
     const customerPhone = normalizePhone(transaction.customerPhone);
     if (!customerName) throw new Error('请填写顾客姓名');
-    if (customerPhone && customerPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
+    if (!customerPhone) throw new Error('请填写顾客手机号');
+    if (customerPhone.length !== 11) throw new Error('请填写 11 位顾客手机号');
 
     return {
       ...transaction,
